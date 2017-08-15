@@ -12,21 +12,39 @@
 		}
 		#result {
 			font-size: 50pt;
+			width: 50%;
+			float: left;
 		}
 
 		.option {
-			font-size: 15pt;
+			font-size: 13pt;
 			fill: steelblue;
 			font-family: sans-serif;
 		}
+		#drawnBox {
+			width: 40%;
+			float:left;
+
+		}
+		.option.drawn {
+			fill: grey;
+		}
+		.option.selected, .option.selected.drawn {
+			fill: red;
+		}
+
 	</style>
 </head>
 <body>
 
 <div><button id=btnChoose>Do you feel lucky?</button></div>
-<div id="result"></div>
+<div>
 
-
+	<div id="result"></div>
+	<div id="drawnBox"><h2>Drawn</h2>
+		<div id="drawn"></div>
+		</div>
+</div>
 <script src="https://d3js.org/d3.v3.min.js"></script>
 <script src="main.js"></script>
 </body>
