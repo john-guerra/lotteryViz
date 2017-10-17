@@ -1,46 +1,77 @@
 /* global d3 */
-var options = [
-  "ALFONSO SANCHEZ  CAMILO ALEJANDRO",
-  "ARCINIEGAS HURTADO JUAN SEBASTIAN",
-  "ARDILA CUADRADO  JOHN EDISSON",
-  "BAGES PRADA  JUAN CAMILO",
-  "BAQUERO MERCHAN  SAMUEL",
-  "BAUTISTA MORA  JAIRO EMILIO",
-  "BELLO JIMENEZ  LAURA NATALIA",
-  "BOHORQUEZ SANCHEZ  BRANDON ANDRES",
-  "CABELLO AGÜERO EDUARDO ARTURO",
-  "CALDERON PACHON  HECTOR JOSE",
-  "CAMACHO CARO JUAN PABLO",
-  "CASTRO VARON JUAN JOSE",
-  "CHAPARRO MACHETE JUAN ESTEBAN",
-  "CORDOBA BORJA  ALEJANDRO",
-  "CUBILLOS SANCHEZ DAVID FERNANDO",
-  "DALEL RUEDA  ESTEBAN",
-  "DE LA VEGA FERNANDEZ ANTONIO JUAN",
-  "DUARTE BERNAL  IVAN DARIO",
-  "GOMEZ CELIS  JUAN SEBASTIAN",
-  "GONZALEZ ALVAREZ CARLOS EDUARDO",
-  "GUZMAN SARMIENTO JUAN DAVID",
-  "IREGUI CARREÑO FELIPE",
-  "MANTILLA ACOSTA  RAFAEL JOSE",
-  "MARIÑO RODRIGEZ  DANIELA",
-  "MARTINEZ CASTAÑO SEBASTIAN",
-  "PAREDES VALDERRAMA ANDREA JULIANA",
-  "PINZON CAPERA  LADY JERALDYNNE",
-  "PLAZAS MONTAÑEZ  LUIS FELIPE",
-  "POVEDA GOMEZ JULIO ANDRES",
-  "ROBAYO GONZALEZ  SANTIAGO",
-  "RODRIGUEZ BARRAGAN JUAN MANUEL",
-  "RODRIGUEZ RUBIO  DIEGO ANDRES",
-  "ROJAS HERRERA  SANTIAGO",
-  "SANDOVAL CORDERO ANDRES",
-  "SOLANO BELTRAN DIANA CATALINA",
-  "TORRES PINZON  JOAN DAVID",
-  "TROCONIS GUIA  JAVIER ANTONIO",
-  "VELANDIA GONZALEZ  ESNEIDER",
-  "VERDUGO QUEVEDO  ANDRES FELIPE",
-  "ZUCCHET CARDENAS DIEGO ALEJANDRO"
-];
+var options = d3.shuffle([
+
+]);
+
+
+// var alreadyCalled = [
+//   "VERDUGO QUEVEDO ANDRES FELIPE",
+//   "MARTINEZ CASTAÑO SEBASTIAN",
+//   "MARIÑO RODRIGEZ DANIELA",
+//   "RODRIGUEZ BARRAGAN JUAN MANUEL",
+//   "CASTRO VARON JUAN JOSE",
+//   "ROBAYO GONZALEZ SANTIAGO",
+//   "VELANDIA GONZALEZ ESNEIDER",
+//   "SANDOVAL CORDERO ANDRES",
+//   "TORRES PINZON JOAN DAVID",
+//   "CALDERON PACHON HECTOR JOSE",
+//   "PINZON CAPERA LADY JERALDYNNE",
+//   "BAGES PRADA JUAN CAMILO",
+//   "GUZMAN SARMIENTO JUAN DAVID",
+//   "GONZALEZ ALVAREZ CARLOS EDUARDO",
+//   "PLAZAS MONTAÑEZ LUIS FELIPE",
+//   "ARDILA CUADRADO JOHN EDISSON",
+//   "PAREDES VALDERRAMA ANDREA JULIANA",
+//   "DUARTE BERNAL IVAN DARIO",
+//   "ALFONSO SANCHEZ CAMILO ALEJANDRO",
+//   "CUBILLOS SANCHEZ DAVID FERNANDO",
+//   "BAUTISTA MORA JAIRO EMILIO",
+//   "MANTILLA ACOSTA RAFAEL JOSE",
+//   "TROCONIS GUIA JAVIER ANTONIO",
+//   "DALEL RUEDA ESTEBAN",
+//   "CHAPARRO MACHETE JUAN ESTEBAN",
+//   "ZUCCHET CARDENAS DIEGO ALEJANDRO",
+//   "ROJAS HERRERA SANTIAGO",
+//   "BAQUERO MERCHAN SAMUEL",
+//   "ARCINIEGAS HURTADO JUAN SEBASTIAN",
+//   "SOLANO BELTRAN DIANA CATALINA",
+//   "RODRIGUEZ RUBIO DIEGO ANDRES",
+//   "CABELLO AGÜERO EDUARDO ARTURO",
+//   "BELLO JIMENEZ LAURA NATALIA",
+//   "GOMEZ CELIS JUAN SEBASTIAN"
+// ];
+
+// function minus(all, minus) {
+//   var iAll, iMinus;
+//   var res = [];
+//   iAll = 0, iMinus;
+//   while (iAll<=iAll.length) {
+//     if (all[iAll] === minus[iMinus]) {
+//       iAll +=1;
+//       iMinus +=1;
+//       continue;
+//     } else (all[iAll] <)
+
+
+
+//   }
+// }
+
+
+// alreadyCalled = alreadyCalled.sort();
+// options = options.reduce(function (res, val) {
+
+//   if (alreadyCalled.indexOf(val) === -1) {
+//     res.push(val);
+//   }
+
+//   return res;
+// }, []);
+
+
+// var minus = options.filter(function (d) {
+//   return !(alreadyCalled.includes(d));
+// });
 
 var allOptions = options.map(function (d, i) {
   return {name:d, id:i, drawn:false};
@@ -96,7 +127,7 @@ function redraw(options) {
 redraw(allOptions);
 
 function onChoose() {
-  var sel = Math.round(Math.random() * optionsLeft.length);
+  var sel = Math.floor(Math.random() * optionsLeft.length);
   var optionSel = optionsLeft.splice(sel, 1)[0];
   optionSel.drawn = true;
   optionsDrawn = [optionSel].concat(optionsDrawn);
