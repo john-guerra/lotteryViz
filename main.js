@@ -1,7 +1,63 @@
 /* global d3 */
 var options = d3.shuffle([
-
+"Nicolas Acevedo Sandoval",
+"German Camilo Andrade Mayorga",
+"Juan Sebastian  Barragan Jeronimo",
+"Nicolas Eduardo Cabrera Venegas",
+"Camilo Andres Carrillo Niño",
+"Santiago  Cortes Fernandez",
+"David Fernando  Cubillos Sanchez",
+"Bibiana Gamba Sabogal",
+"Juan Diego  Gonzalez Arteta",
+"David Gustavo Guarin Rojas",
+"John Alexis Guerra Gomez",
+"Camilo Andres Montenegro Hernandez",
+"Cristian Camilo Novoa Avellaneda",
+"Sergio Andres Pardo Sanchez",
+"Carlos Gabriel  Peñaloza Gomez",
+"Juan Sebastian  Prieto Bustamante",
+"Paula Juliana Ramirez Gonzalez",
+"Juan David  Vega Guzman",
+"Freddy Andres Vera Hernandez",
+"Camilo  Zambrano Votto"
 ]);
+
+// https://cmatskas.com/get-url-parameters-using-javascript/
+var parseQueryString = function(url) {
+  var urlParams = {};
+  url.replace(
+    new RegExp("([^?=&]+)(=([^&]*))?", "g"),
+    function($0, $1, $2, $3) {
+      urlParams[$1] = $3;
+    }
+  );
+  
+  return urlParams;
+}
+
+var params = parseQueryString(location.search);
+if (params && params.section==="2") {
+  options = [
+    "AGUILAR LEON  NICOLAS",
+    "ALVARADO CERON  PABLO ALEJANDRO",
+    "BUSTAMANTE ATEHORTUA  JUAN CAMILO",
+    "CHAVES SANGUINO JUAN DIEGO",
+    "DOMINGUEZ OSORIO  JUAN MANUEL",
+    "ECHEVERRI ROMERO  ALEJANDRO",
+    "GARCIA ESCALLON ROGELIO",
+    "LAITON VARGAS ANDRES DAVID",
+    "LOPEZ CORREDOR  FABIO ANDRES",
+    "LOVERA LOZANO JUAN MANUEL ALBERTO",
+    "MENDEZ PERALTA  JUAN FELIPE",
+    "OLIVARES VARGAS ANDRES FELIPE",
+    "PINILLA RAMIREZ JUAN CAMILO",
+    "RAVELO MENDEZ WILLIAM RICARDO",
+    "VEGA SALAZAR  RAMON ESTEBAN",
+    "VELANDIA GONZALEZ ESNEIDER",
+    "VENEGAS BERNAL  TOMAS FELIPE"
+  ];
+
+}
 
 
 // var alreadyCalled = [
@@ -116,7 +172,8 @@ function redraw(options) {
     .transition().duration(1000)
     .attr("transform", function (d) {
       return "translate(" + width/2 + "," + height/2  +
-        ") rotate(" + angleScale(d.id) + ")";
+        ") rotate(" + angleScale(d.id) + ")" +
+        ", translate(30,0)";
     });
 
   optionsSel.exit().remove();
