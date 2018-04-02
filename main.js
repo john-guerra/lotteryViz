@@ -10,7 +10,6 @@ var options = d3.shuffle([
 "Bibiana Gamba Sabogal",
 "Juan Diego  Gonzalez Arteta",
 "David Gustavo Guarin Rojas",
-"John Alexis Guerra Gomez",
 "Camilo Andres Montenegro Hernandez",
 "Cristian Camilo Novoa Avellaneda",
 "Sergio Andres Pardo Sanchez",
@@ -31,7 +30,7 @@ var parseQueryString = function(url) {
       urlParams[$1] = $3;
     }
   );
-  
+
   return urlParams;
 }
 
