@@ -185,32 +185,39 @@ redraw(allOptions);
 function onChoose() {
   var sel = Math.floor(Math.random() * optionsLeft.length);
   var optionSel = optionsLeft.splice(sel, 1)[0];
-  optionSel.drawn = true;
-  optionsDrawn = [optionSel].concat(optionsDrawn);
-  angleScale
-    .range([0, endAngle]);
-  var selAngle = angleScale(optionSel.id);
+  
+  if(optionSel != undefined) {
+    optionSel.drawn = true;
+    optionsDrawn = [optionSel].concat(optionsDrawn);
+    angleScale
+      .range([0, endAngle]);
+    var selAngle = angleScale(optionSel.id);
 
-  console.log("sel="+ sel +" angle="+selAngle + " option " + optionSel.name);
+    console.log("sel="+ sel +" angle="+selAngle + " option " + optionSel.name);
 
-  angleScale.range([-selAngle, endAngle-selAngle]);
-  console.log("#id "+sel);
-  d3.selectAll(".option")
-    .classed("selected", false);
-  redraw(allOptions);
-  console.log("#id" + optionSel.id);
-  d3.select("#id" + optionSel.id)
-    .classed("selected", true);
+    angleScale.range([-selAngle, endAngle-selAngle]);
+    console.log("#id "+sel);
+    d3.selectAll(".option")
+      .classed("selected", false);
+    redraw(allOptions);
+    console.log("#id" + optionSel.id);
+    d3.select("#id" + optionSel.id)
+      .classed("selected", true);
 
-  var drawn = d3.select("#drawn").selectAll(".drawn")
-    .data(optionsDrawn);
+    var drawn = d3.select("#drawn").selectAll(".drawn")
+      .data(optionsDrawn);
 
-  drawn.enter()
-    .append("p");
-  drawn
-    .attr("class", "drawn")
-    .text(function (d) { return d.name; });
-  drawn.exit().remove();
+    drawn.enter()
+      .append("p");
+    drawn
+      .attr("class", "drawn")
+      .text(function (d) { return d.name; });
+    drawn.exit().remove();
 
-  // d3.select("#result").text("Seleccionado = " + options[sel]);
+    // d3.select("#result").text("Seleccionado = " + options[sel]);
+  }
+  else {
+    console.log("Full lottery!!!");
+    alert("Full lottery!!!");  // Optional
+  }
 }
