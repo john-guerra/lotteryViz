@@ -9,7 +9,8 @@ const { MongoClient } = mongodb;
 
 const url = "mongodb://localhost:27017";
 
-const initDate = new Date(2022, 7, 13);
+const initDate = new Date(2023, 8, 6);
+console.log("Using date", initDate.toDateString());
 
 const client = new MongoClient(url);
 client.connect(function(err) {

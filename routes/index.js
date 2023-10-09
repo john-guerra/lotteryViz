@@ -1,4 +1,6 @@
 var express = require("express");
+const cors = require("cors");
+
 var router = express.Router();
 
 const myDB = require("../db/myDB.js");
@@ -46,12 +48,29 @@ router.get("/getGrades/:course", function(req, res) {
   });
 });
 
-router.get("/getAllGrades/:course", function(req, res) {
-  console.log("getAllGrades");
+const corsOptions = {
+  origin: ["http://localhost:4000", "https://john-guerra.static.observableusercontent.com"],
+  // origin: "https://john-guerra.static.observableusercontent.com",
+  optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
+};
+
+router.get("/getAllGrades/:course", cors(corsOptions), function(req, res) {
+  console.log("getAllGrades", req);
+
+
 
   myDB.getAllGrades(req.params.course, (grades) => {
-    console.log("Got grades!");
+    console.log("Got grades for course!", req.params.course);
     res.json(grades);
+  });
+});
+
+router.get("/getCounts/:course",cors(corsOptions), function(req, res) {
+  console.log("getCounts");
+
+  myDB.getCounts(req.params.course, (counts) => {
+    console.log("Got counts!");
+    res.json(counts);
   });
 });
 
