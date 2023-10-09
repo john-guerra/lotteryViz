@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import * as d3 from "d3";
 
@@ -17,8 +17,21 @@ import * as d3 from "d3";
 //   return urlParams;
 // };
 
-const Lottery = props => {
-  const options = d3.shuffle(props.options);
+const Lottery = (props) => {
+  const ADJUSTMENT_FACTOR = 10;
+
+  let [adjust, setAdjust] = useState(true);
+  let [avoidRepetition, setAvoidRepetition] = useState(false);
+  const resultRef = useRef();
+
+  const dCounts = new Map(props.counts.map((d) => [d._id, d]));
+  console.log("dCounts", props.counts, dCounts);
+
+  // let options = d3.shuffle(props.options);
+
+  //Create a hash of drawn names
+  const hashNamesDrawn = [];
+  props.optionsDrawn.forEach((d) => (hashNamesDrawn[d.name] = 1));
 
   // const [optionsDrawn, setOptionsDrawn] = useState([]);
 
@@ -27,36 +40,68 @@ const Lottery = props => {
   //   options = [];
   // }
 
-  const allOptions = options.map(function(d, i) {
-    return { name: d, id: i, drawn: false };
-  });
-
-  //Create a hash of drawn names
-  const hashNamesDrawn = [];
-  props.optionsDrawn.forEach(d => (hashNamesDrawn[d.name] = 1));
-
-  // Remaining options
-  const optionsLeft = allOptions.filter(
-    d => hashNamesDrawn[d.name] === undefined
-  );
-
-  console.log("Options Left", optionsLeft.length);
-
-  const resultRef = useRef();
-
-  const width = 800,
+  let width = 800,
     height = 800,
-    endAngle = 360 - 360 / options.length;
+    endAngle = 360 - 360 / props.options.length;
 
   const angleScale = d3
     .scaleLinear()
-    .domain([0, options.length - 1])
+    .domain([0, props.options.length - 1])
     .range([0, endAngle]);
+
+  let allOptions = [], // used for drawing
+    optionsLeft = []; // Remaining options
+
+  function updateAllOptions(ops) {
+    allOptions = ops.map(function(d, i) {
+      return { name: d, id: i, drawn: false };
+    });
+
+    if (avoidRepetition) {
+      optionsLeft = allOptions.filter(
+        (d) => hashNamesDrawn[d.name] === undefined
+      );      
+    } else {
+      // Don't mind which ones have been previously called selected
+      optionsLeft = allOptions;
+    }
+
+    endAngle = endAngle = 360 - 360 / allOptions.length;
+    angleScale.domain([0, allOptions.length - 1]).range([0, endAngle]);
+    return allOptions;
+  }
+
+  function getOptionsFromCounts() {
+    if (props.counts.length === 0) return props.options;
+
+    const sortedCounts = props.counts.sort((a, b) => a.count - b.count);
+
+    const maxCount = sortedCounts.at(-1).count;
+    const adjustedCounts = sortedCounts.map((d) => {
+      d.adjustedCount = (maxCount - d.count) * ADJUSTMENT_FACTOR + 1;
+      return d;
+    });
+    const res = adjustedCounts
+      .map((d) => Array.from({ length: d.adjustedCount }).map((_) => d._id))
+      .flat();
+
+    console.log("adjusted", res);
+
+    return res;
+  }
+
+  if (adjust) {
+    updateAllOptions(getOptionsFromCounts());
+  } else {
+    updateAllOptions(d3.shuffle(props.options));
+  }
+
+  console.log("Options Left", optionsLeft.length);
 
   // Redraw
   function redraw() {
     const options = allOptions;
-    console.log("redraw", options);
+    // console.log("redraw", options);
 
     const svg = d3
       .select(resultRef.current)
@@ -66,26 +111,26 @@ const Lottery = props => {
       .attr("width", width)
       .attr("height", height);
 
-    const optionsSel = svg.selectAll(".option").data(options);
+    const optionsSel = svg.selectAll(".option").data(options, (d) => d.id);
 
     const opEnter = optionsSel
       .enter()
       .append("text")
       .classed("option", "true")
-      .classed("drawn", d => hashNamesDrawn[d.name]);
+      .classed("drawn", (d) => hashNamesDrawn[d.name]);
 
-    const translate = sel =>
+    const translate = (sel) =>
       sel.attr("transform", function(d) {
         return (
           "translate(" +
-          (width / 2 - 7 * options.length) +
+          (width / 2 - 3 * options.length) +
           "," +
           height / 2 +
           ") rotate(" +
           angleScale(d.id) +
           ")" +
           ", translate(" +
-          7 * options.length +
+          3 * options.length +
           ",0)"
         );
       });
@@ -95,10 +140,12 @@ const Lottery = props => {
       // .attr("x", width/2)
       // .attr("y", height/2)
       .attr("id", function(d) {
+        // console.log("id", d, dCounts, dCounts.get(d.name));
         return "id" + d.id;
       })
-      .classed("drawn", d => hashNamesDrawn[d.name])
-      .text(d => d.name)
+      .attr("key", (d) => d.id)
+      .classed("drawn", (d) => hashNamesDrawn[d.name])
+      .text((d) => `${d.name} ${dCounts.get(d.name)?.count}`)
       .transition()
       .duration(1000)
       .call(translate);
@@ -138,19 +185,57 @@ const Lottery = props => {
     // setOptionsDrawn([tmpOptionSel].concat(optionsDrawn));
   }
 
+  function onAdjustByHistory(evt) {
+    setAdjust(evt.target.checked);
+
+    console.log("adjust", adjust);
+  }
+
+  function onAvoidRepetition(evt) {
+    setAvoidRepetition(evt.target.checked);
+
+    console.log("avoidRepetition", adjust);
+  }
+
   // Do only once
   useEffect(() => {
     redraw();
-  }, [props.options]);
+  }, [props.options, adjust, props]);
 
+  // console.log("Lottery Render, counts", props.counts, " adjust ", adjust);
   return (
     <div className="Lottery">
-      <button id="btnChoose" onClick={onChoose}>
-        Do you feel lucky?
-      </button>
+      <div>
+        <button id="btnChoose" onClick={onChoose}>
+          Do you feel lucky?
+        </button>
 
-      <small>Options left: {optionsLeft.length}</small>
-
+        <small>Options left: {optionsLeft.length}</small>
+      </div>
+      <div>
+        {" "}
+        <label>
+          {" "}
+          Adjust chances by history
+          <input
+            onChange={onAdjustByHistory}
+            checked={adjust}
+            type="checkbox"
+          />
+        </label>
+      </div>
+      <div>
+        {" "}
+        <label>
+          {" "}
+          Avoid repetition
+          <input
+            onChange={onAvoidRepetition}
+            checked={avoidRepetition}
+            type="checkbox"
+          />
+        </label>
+      </div>
       <div id="result" ref={resultRef}></div>
     </div>
   );
@@ -159,7 +244,9 @@ const Lottery = props => {
 Lottery.propTypes = {
   options: PropTypes.arrayOf(PropTypes.string).isRequired,
   setOptionSel: PropTypes.func.isRequired,
-  optionsDrawn: PropTypes.array.isRequired
+  optionsDrawn: PropTypes.array.isRequired,
+  todayGrades: PropTypes.array.isRequired,
+  counts: PropTypes.array.isRequired,
 };
 
 export default Lottery;

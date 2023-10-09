@@ -3,6 +3,8 @@ import PropTypes from "prop-types";
 import Lottery from "./Lottery";
 import "./App.css";
 import ListSelected from "./ListSelected";
+import * as d3 from "d3";
+import LotteryResultsFromMongo from "./LotteryResultsFromMongo";
 
 import { classes } from "./students.mjs";
 
@@ -10,15 +12,24 @@ const App = () => {
   const [course, setCourse] = useState(Object.keys(classes)[0]);
   const [options, setOptions] = useState(classes[course]);
   const [todayGrades, setTodayGrades] = useState([]);
+  const [counts, setCounts] = useState([]);
   const [optionSel, setOptionSel] = useState(null);
   const [lastOptionSel, setLastOptionSel] = useState(null);
   const [search, setSearch] = useState("");
   const inSearch = useRef();
   const refreshGrades = () => {
+    refreshCounts();
     fetch("getGrades/" + course)
       .then((res) => res.json())
       .then((grades) => {
         setTodayGrades(grades);
+      });
+  };
+  const refreshCounts = () => {
+    fetch("getCounts/" + course)
+      .then((res) => res.json())
+      .then((_counts) => {
+        setCounts(_counts);
       });
   };
   const onSearch = () => {
@@ -36,7 +47,8 @@ const App = () => {
       setOptionSel({ name: matches });
     }
   };
-  useEffect(refreshGrades, []);
+
+  useEffect(refreshGrades, [course]);
 
   const onChangeCourse = (evt) => {
     console.log("course", evt.target.value);
@@ -51,7 +63,7 @@ const App = () => {
           Course:{" "}
           <select name="course" onChange={onChangeCourse}>
             {Object.keys(classes).map((c) => (
-              <option value={c}>{c}</option>
+              <option value={c} key={c}>{c}</option>
             ))}
           </select>
         </label>
@@ -59,17 +71,31 @@ const App = () => {
     );
   };
 
-  console.log("App grades", optionSel);
+  function getMedian() {
+    const sums = counts.map((d) => +d.sum).sort();
+    const half = Math.floor(sums.length / 2);
+    // console.log(sums);
+    return d3.median(sums);
+  }
+
+  console.log("App grades", optionSel, "counts", counts);
   return (
     <div className="App">
       {" "}
-      <h1>Class participation</h1> {renderCourseSelector()}
+      <h1>
+        Class participation
+        <br />
+        <small>Current class median: {getMedian()} points</small>
+      </h1>{" "}
+      {renderCourseSelector()}
       <div>
         {" "}
         <Lottery
           options={options}
           setOptionSel={setOptionSel}
           optionsDrawn={todayGrades}
+          counts={counts}
+          todayGrades={todayGrades}
         ></Lottery>{" "}
         <div>
           {" "}
@@ -95,13 +121,23 @@ const App = () => {
                 {" "}
                 <div>
                   {" "}
-                  <div>{optionSel.name}</div>{" "}
+                  <div className="optionSel">{optionSel.name}</div>{" "}
                 </div>{" "}
               </div>{" "}
             </div>
           ) : (
             <span></span>
           )}{" "}
+          <div id="lotteryResultsFromMongo">
+            <LotteryResultsFromMongo
+              courseName={course}
+              optionsDrawn={todayGrades}
+              optionSel={optionSel}
+            ></LotteryResultsFromMongo>
+          </div>
+          {/* Lottery Results from Mongo */}
+
+          
           <h2>History</h2>{" "}
           <div id="drawn">
             {" "}
@@ -112,6 +148,7 @@ const App = () => {
               onSelect={refreshGrades}
             ></ListSelected>{" "}
           </div>{" "}
+          {/* /drawn */}
         </div>{" "}
       </div>{" "}
     </div>

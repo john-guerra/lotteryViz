@@ -6,7 +6,7 @@ const url = process.env.MONGO_URL || "mongodb://localhost:27017";
 function deleteGrade(grade, cbk) {
   dbName = "lottery_" + grade.course;
 
-  const client = new MongoClient(url);
+  const client = new MongoClient(url, { useUnifiedTopology: true });
   client.connect(function(err) {
     assert.equal(null, err);
     console.log("Connected successfully to server");
@@ -129,7 +129,7 @@ function getAllGrades(course, cbk) {
       .find({})
       .sort({ timestamp: -1 })
       .toArray((err, grades) => {
-        console.log("got grades", grades.length);
+        console.log("got grades", grades.length, " dbname", dbName);
         if (err) {
           cbk(err);
           return;
@@ -139,11 +139,47 @@ function getAllGrades(course, cbk) {
   });
 }
 
+function getCounts(course, cbk) {
+  dbName = "lottery_" + course;
+
+  const client = new MongoClient(url);
+  client.connect(function(err) {
+    assert.equal(null, err);
+    console.log("Connected successfully to server");
+
+    const grades = client.db(dbName).collection("grades");
+
+    const query = [
+      {
+        $group: {
+          _id: "$name",
+          count: {
+            $count: {},
+          },
+          sum: {
+            $sum: "$grade",
+          },
+        },
+      },
+    ];
+
+    grades.aggregate(query).toArray((err, counts) => {
+      console.log("got counts", counts.length);
+      if (err) {
+        cbk(err);
+        return;
+      }
+      cbk(counts);
+    });
+  });
+}
+
 const myDB = {
   deleteGrade,
   setGrade,
   getGrades,
   getAllGrades,
+  getCounts,
 };
 
 module.exports = myDB;
