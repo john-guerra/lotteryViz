@@ -13,7 +13,7 @@ const initDate = new Date(2023, 8, 6);
 console.log("Using date", initDate.toDateString());
 
 const client = new MongoClient(url);
-client.connect(function(err) {
+client.connect(async function(err) {
   assert.equal(null, err);
   console.log("Connected successfully to server");
 
@@ -21,15 +21,20 @@ client.connect(function(err) {
     console.log("initializing", cl);
     const grades = client.db(`lottery_${cl}`).collection("grades");
     for (let name of classes[cl]) {
-      grades.insertOne(
-        {
-          name,
-          date: initDate.toDateString(),
-          grade: 0,
-          timestamp: initDate,
-        },
-        (res) => console.log("Inserted ", name, res)
-      );
+      if ((await grades.find({ name }).count()) === 0) {
+        console.log(`Name not found ${name} initializing`);
+
+        grades.insertOne(
+          {
+            name,
+            date: initDate.toDateString(),
+            grade: 0,
+            timestamp: initDate,
+          },
+          (res) => console.log("Inserted ", name, res)
+        );
+        
+      }
     }
   }
 });

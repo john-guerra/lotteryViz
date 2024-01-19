@@ -1,13 +1,18 @@
-var express = require("express");
-var path = require("path");
-var cookieParser = require("cookie-parser");
-// var lessMiddleware = require("less-middleware");
-var logger = require("morgan");
-const cors = require("cors");
+import express from "express";
+import path from "path";
+import cookieParser from "cookie-parser";
+import lessMiddleware from "less-middleware";
+import logger from "morgan";
+import cors from "cors";
 
-var indexRouter = require("./routes/index");
+import indexRouter from "./routes/index.js";
 
-var app = express();
+import { URL } from "url";
+
+const __filename = new URL("", import.meta.url).pathname;
+const __dirname = new URL(".", import.meta.url).pathname;
+
+const app = express();
 
 app.use(logger("dev"));
 app.use(express.json());
@@ -20,4 +25,5 @@ app.use(express.static(path.join(__dirname, "front/build")));
 
 app.use("/", indexRouter);
 
-module.exports = app;
+// module.exports = app;
+export default app;

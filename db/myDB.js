@@ -1,6 +1,10 @@
-const MongoClient = require("mongodb").MongoClient;
-const assert = require("assert");
 
+import mongodb from "mongodb";
+import assert from "assert";
+
+const { MongoClient } = mongodb;
+
+let dbName = "lottery_db_spring2024";
 const url = process.env.MONGO_URL || "mongodb://localhost:27017";
 
 function deleteGrade(grade, cbk) {
@@ -182,4 +186,6 @@ const myDB = {
   getCounts,
 };
 
-module.exports = myDB;
+// module.exports = myDB;
+
+export default myDB;

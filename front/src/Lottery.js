@@ -17,15 +17,19 @@ import * as d3 from "d3";
 //   return urlParams;
 // };
 
+
+import "./Lottery.css";
+
+
+
 const Lottery = (props) => {
   const ADJUSTMENT_FACTOR = 10;
 
   let [adjust, setAdjust] = useState(true);
-  let [avoidRepetition, setAvoidRepetition] = useState(false);
+  let [avoidRepetition, setAvoidRepetition] = useState(true);
   const resultRef = useRef();
 
-  const dCounts = new Map(props.counts.map((d) => [d._id, d]));
-  console.log("dCounts", props.counts, dCounts);
+  const dCounts = getDCounts();
 
   // let options = d3.shuffle(props.options);
 
@@ -40,9 +44,9 @@ const Lottery = (props) => {
   //   options = [];
   // }
 
-  let width = 800,
+  let width = 600,
     height = 800,
-    endAngle = 360 - 360 / props.options.length;
+    endAngle = 360 - (360 / props.options.length);
 
   const angleScale = d3
     .scaleLinear()
@@ -52,6 +56,22 @@ const Lottery = (props) => {
   let allOptions = [], // used for drawing
     optionsLeft = []; // Remaining options
 
+  // computes dCounts making sure options not drawn start on 0
+  function getDCounts() {
+    const dCounts = new Map(
+      props.options.map((d) => [d, {_id:d, count: 0, sum: 0 }])
+    );
+    for (let d of props.counts) {
+      // Only include registered students
+      if (dCounts.has(d._id)) {
+        dCounts.set(d._id, d);
+      }
+      
+    }
+    console.log("dCounts",  dCounts);
+    return dCounts;
+  }
+
   function updateAllOptions(ops) {
     allOptions = ops.map(function(d, i) {
       return { name: d, id: i, drawn: false };
@@ -60,7 +80,7 @@ const Lottery = (props) => {
     if (avoidRepetition) {
       optionsLeft = allOptions.filter(
         (d) => hashNamesDrawn[d.name] === undefined
-      );      
+      );
     } else {
       // Don't mind which ones have been previously called selected
       optionsLeft = allOptions;
@@ -74,7 +94,9 @@ const Lottery = (props) => {
   function getOptionsFromCounts() {
     if (props.counts.length === 0) return props.options;
 
-    const sortedCounts = props.counts.sort((a, b) => a.count - b.count);
+    // Start from the counts in the database. Use dCounts as it has only the ones registered
+    let sortedCounts = Array.from(dCounts.values()).sort((a, b) => a.count - b.count);
+
 
     const maxCount = sortedCounts.at(-1).count;
     const adjustedCounts = sortedCounts.map((d) => {
@@ -85,7 +107,7 @@ const Lottery = (props) => {
       .map((d) => Array.from({ length: d.adjustedCount }).map((_) => d._id))
       .flat();
 
-    console.log("adjusted", res);
+    // console.log("Options from counts", res);
 
     return res;
   }
@@ -101,7 +123,7 @@ const Lottery = (props) => {
   // Redraw
   function redraw() {
     const options = allOptions;
-    // console.log("redraw", options);
+    console.log("redraw", options.length);
 
     const svg = d3
       .select(resultRef.current)
@@ -123,14 +145,14 @@ const Lottery = (props) => {
       sel.attr("transform", function(d) {
         return (
           "translate(" +
-          (width / 2 - 3 * options.length) +
+          (width / 2 - 2 * options.length) +
           "," +
           height / 2 +
           ") rotate(" +
           angleScale(d.id) +
           ")" +
           ", translate(" +
-          3 * options.length +
+          2 * options.length +
           ",0)"
         );
       });
@@ -156,7 +178,7 @@ const Lottery = (props) => {
   function onChoose() {
     const sel = Math.floor(Math.random() * optionsLeft.length);
     const tmpOptionSel = optionsLeft.splice(sel, 1)[0];
-    console.log("onChoose", sel);
+    console.log("onChoose", sel, "options left", optionsLeft.length, "angleScale", angleScale.domain(), angleScale.range());
 
     if (tmpOptionSel === undefined) {
       console.log("No more options left");
@@ -176,13 +198,15 @@ const Lottery = (props) => {
     angleScale.range([-selAngle, endAngle - selAngle]);
     console.log("#id " + sel);
     d3.selectAll(".option").classed("selected", false);
-    redraw();
+    
 
     console.log("#id" + tmpOptionSel.id);
     d3.select("#id" + tmpOptionSel.id).classed("selected", true);
 
     props.setOptionSel(tmpOptionSel);
     // setOptionsDrawn([tmpOptionSel].concat(optionsDrawn));
+
+    redraw();
   }
 
   function onAdjustByHistory(evt) {
