@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import PropTypes from "prop-types";
+// import PropTypes from "prop-types";
 import Lottery from "./Lottery";
 import "./App.css";
 import ListSelected from "./ListSelected";
@@ -63,7 +63,9 @@ const App = () => {
           Course:{" "}
           <select name="course" onChange={onChangeCourse}>
             {Object.keys(classes).map((c) => (
-              <option value={c} key={c}>{c}</option>
+              <option value={c} key={c}>
+                {c}
+              </option>
             ))}
           </select>
         </label>
@@ -73,7 +75,7 @@ const App = () => {
 
   function getMedian() {
     const sums = counts.map((d) => +d.sum).sort();
-    const half = Math.floor(sums.length / 2);
+    // const half = Math.floor(sums.length / 2);
     // console.log(sums);
     return d3.median(sums);
   }
@@ -88,68 +90,76 @@ const App = () => {
         <small>Current class median: {getMedian()} points</small>
       </h1>{" "}
       {renderCourseSelector()}
-      <div>
-        {" "}
-        <Lottery
-          options={options}
-          setOptionSel={setOptionSel}
-          optionsDrawn={todayGrades}
-          counts={counts}
-          todayGrades={todayGrades}
-        ></Lottery>{" "}
-        <div>
-          {" "}
-          <br /> <br />{" "}
-          <label>
+      <div className="row">
+        <div className="col-5">
+          <Lottery
+            options={options}
+            setOptionSel={setOptionSel}
+            optionsDrawn={todayGrades}
+            counts={counts}
+            todayGrades={todayGrades}
+          ></Lottery>
+        </div>
+        {/* /col-5  lottery */}
+        
+        
+        
+        <div class="col-7">
+          <div>
             {" "}
-            Search{" "}
-            <input
-              type="text"
-              ref={inSearch}
-              value={search}
-              onChange={onSearch}
-            />{" "}
-          </label>{" "}
-        </div>{" "}
-        <div id="drawnBox" className="bgWhite">
-          {" "}
-          {optionSel ? (
-            <div>
+            <br /> <br />{" "}
+            <label>
               {" "}
-              <h2>Drawn</h2>{" "}
-              <div className="selected">
-                {" "}
-                <div>
-                  {" "}
-                  <div className="optionSel">{optionSel.name}</div>{" "}
-                </div>{" "}
-              </div>{" "}
-            </div>
-          ) : (
-            <span></span>
-          )}{" "}
-          <div id="lotteryResultsFromMongo">
-            <LotteryResultsFromMongo
-              courseName={course}
-              optionsDrawn={todayGrades}
-              optionSel={optionSel}
-            ></LotteryResultsFromMongo>
-          </div>
-          {/* Lottery Results from Mongo */}
-
-          
-          <h2>History</h2>{" "}
-          <div id="drawn">
-            {" "}
-            <ListSelected
-              course={course}
-              optionsDrawn={todayGrades}
-              optionSel={optionSel}
-              onSelect={refreshGrades}
-            ></ListSelected>{" "}
+              Search{" "}
+              <input
+                type="text"
+                ref={inSearch}
+                value={search}
+                onChange={onSearch}
+              />{" "}
+            </label>{" "}
           </div>{" "}
-          {/* /drawn */}
-        </div>{" "}
+          <div id="drawnBox" className="bgWhite">
+            {" "}
+            {optionSel ? (
+              <div>
+                {" "}
+                <h2>Drawn</h2>{" "}
+                <div className="selected">
+                  {" "}
+                  <div>
+                    {" "}
+                    <div className="optionSel">{optionSel.name}</div>{" "}
+                  </div>{" "}
+                </div>{" "}
+              </div>
+            ) : (
+              <span></span>
+            )}{" "}
+            <div id="lotteryResultsFromMongo">
+              <LotteryResultsFromMongo
+                courseName={course}
+                optionsDrawn={todayGrades}
+                optionSel={optionSel}
+              ></LotteryResultsFromMongo>
+            </div>
+            {/* Lottery Results from Mongo */}
+            <h2>History</h2>{" "}
+            <div id="drawn">
+              {" "}
+              <ListSelected
+                course={course}
+                optionsDrawn={todayGrades}
+                optionSel={optionSel}
+                onSelect={refreshGrades}
+              ></ListSelected>{" "}
+            </div>{" "}
+            {/* /drawn */}
+          </div>{" "}
+        </div>
+        {/* /col-7 drawnBox */}
+
+
       </div>{" "}
     </div>
   );

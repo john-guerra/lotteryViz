@@ -1,14 +1,16 @@
-var express = require("express");
-const cors = require("cors");
+import express from "express";
+import cors from "cors";
 
-var router = express.Router();
+let router = express.Router();
 
-const myDB = require("../db/myDB.js");
+import myDB from "../db/myDB.js";
 
 // const dbName = "lottery_web";
 // const dbName = "lottery_web_spring2021";
 // const dbName = "lottery_infovis_spring2021";
 let dbName = "lottery_web_fall2022";
+
+import { classes } from "../front/src/students.mjs";
 
 // STUDENT LIST GOES INTO front/src/students.mjs
 
@@ -49,23 +51,25 @@ router.get("/getGrades/:course", function(req, res) {
 });
 
 const corsOptions = {
-  origin: ["http://localhost:4000", "https://john-guerra.static.observableusercontent.com"],
+  origin: [
+    "http://localhost:4000",
+    "https://john-guerra.static.observableusercontent.com",
+  ],
   // origin: "https://john-guerra.static.observableusercontent.com",
   optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
 };
 
 router.get("/getAllGrades/:course", cors(corsOptions), function(req, res) {
-  console.log("getAllGrades", req);
-
-
+  console.log("getAllGrades");
 
   myDB.getAllGrades(req.params.course, (grades) => {
     console.log("Got grades for course!", req.params.course);
-    res.json(grades);
+
+    res.json(grades.filter(g => classes[req.params.course].includes(g.name)));
   });
 });
 
-router.get("/getCounts/:course",cors(corsOptions), function(req, res) {
+router.get("/getCounts/:course", cors(corsOptions), function(req, res) {
   console.log("getCounts");
 
   myDB.getCounts(req.params.course, (counts) => {
@@ -74,4 +78,5 @@ router.get("/getCounts/:course",cors(corsOptions), function(req, res) {
   });
 });
 
-module.exports = router;
+// module.exports = router;
+export default router;
