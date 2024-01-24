@@ -96,15 +96,14 @@ const App = () => {
             options={options}
             setOptionSel={setOptionSel}
             optionsDrawn={todayGrades}
+            optionSel={optionSel}
             counts={counts}
             todayGrades={todayGrades}
           ></Lottery>
         </div>
         {/* /col-5  lottery */}
-        
-        
-        
-        <div class="col-7">
+
+        <div className="col-7">
           <div>
             {" "}
             <br /> <br />{" "}
@@ -158,8 +157,6 @@ const App = () => {
           </div>{" "}
         </div>
         {/* /col-7 drawnBox */}
-
-
       </div>{" "}
     </div>
   );

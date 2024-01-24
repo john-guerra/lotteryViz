@@ -16,9 +16,6 @@
   float: left;
   background: inherit;
 }
-.option .option.drawn {
-  fill: grey;
-}
 .option #btnChoose {
   font-size: 150%;
 }
@@ -27,6 +24,9 @@
 }
 .option div.drawn .name {
   font-size: 120%;
+}
+.option.drawn {
+  fill: grey;
 }
 .option.selected,
 .option.selected.drawn {

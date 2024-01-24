@@ -8,7 +8,9 @@ import myDB from "../db/myDB.js";
 // const dbName = "lottery_web";
 // const dbName = "lottery_web_spring2021";
 // const dbName = "lottery_infovis_spring2021";
-let dbName = "lottery_web_fall2022";
+// let dbName = "lottery_web_fall2022";
+
+const FILTER_BY_REGISTERED = true;
 
 import { classes } from "../front/src/students.mjs";
 
@@ -65,7 +67,12 @@ router.get("/getAllGrades/:course", cors(corsOptions), function(req, res) {
   myDB.getAllGrades(req.params.course, (grades) => {
     console.log("Got grades for course!", req.params.course);
 
-    res.json(grades.filter(g => classes[req.params.course].includes(g.name)));
+    res.json(
+      grades.filter(
+        (g) =>
+          !FILTER_BY_REGISTERED || classes[req.params.course].includes(g.name)
+      )
+    );
   });
 });
 
@@ -74,7 +81,12 @@ router.get("/getCounts/:course", cors(corsOptions), function(req, res) {
 
   myDB.getCounts(req.params.course, (counts) => {
     console.log("Got counts!");
-    res.json(counts);
+    res.json(
+      counts.filter(
+        (g) =>
+          !FILTER_BY_REGISTERED || classes[req.params.course].includes(g._id)
+      )
+    );
   });
 });
 
