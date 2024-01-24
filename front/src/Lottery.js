@@ -17,10 +17,11 @@ import * as d3 from "d3";
 //   return urlParams;
 // };
 
-
 import "./Lottery.css";
 
-
+// Initial range values pending number of options
+const angleScale = d3.scaleLinear().range([0, 0]);
+let prevOptionsLength = null;
 
 const Lottery = (props) => {
   const ADJUSTMENT_FACTOR = 10;
@@ -44,14 +45,8 @@ const Lottery = (props) => {
   //   options = [];
   // }
 
-  let width = 600,
-    height = 800,
-    endAngle = 360 - (360 / props.options.length);
-
-  const angleScale = d3
-    .scaleLinear()
-    .domain([0, props.options.length - 1])
-    .range([0, endAngle]);
+  let width = resultRef.current?.clientWidth ?? 600,
+    height = 600;
 
   let allOptions = [], // used for drawing
     optionsLeft = []; // Remaining options
@@ -59,21 +54,19 @@ const Lottery = (props) => {
   // computes dCounts making sure options not drawn start on 0
   function getDCounts() {
     const dCounts = new Map(
-      props.options.map((d) => [d, {_id:d, count: 0, sum: 0 }])
+      props.options.map((d) => [d, { _id: d, count: 0, sum: 0 }])
     );
     for (let d of props.counts) {
       // Only include registered students
       if (dCounts.has(d._id)) {
         dCounts.set(d._id, d);
       }
-      
     }
-    console.log("dCounts",  dCounts);
     return dCounts;
   }
 
   function updateAllOptions(ops) {
-    allOptions = ops.map(function(d, i) {
+    allOptions = ops.map(function (d, i) {
       return { name: d, id: i, drawn: false };
     });
 
@@ -86,8 +79,6 @@ const Lottery = (props) => {
       optionsLeft = allOptions;
     }
 
-    endAngle = endAngle = 360 - 360 / allOptions.length;
-    angleScale.domain([0, allOptions.length - 1]).range([0, endAngle]);
     return allOptions;
   }
 
@@ -95,8 +86,9 @@ const Lottery = (props) => {
     if (props.counts.length === 0) return props.options;
 
     // Start from the counts in the database. Use dCounts as it has only the ones registered
-    let sortedCounts = Array.from(dCounts.values()).sort((a, b) => a.count - b.count);
-
+    let sortedCounts = Array.from(dCounts.values()).sort(
+      (a, b) => a.count - b.count
+    );
 
     const maxCount = sortedCounts.at(-1).count;
     const adjustedCounts = sortedCounts.map((d) => {
@@ -122,8 +114,26 @@ const Lottery = (props) => {
 
   // Redraw
   function redraw() {
+    angleScale.domain([0, allOptions.length - 1]);
+    if (prevOptionsLength !== allOptions.length) {
+      angleScale.range([0, 360 - 360 / allOptions.length]);
+      prevOptionsLength = allOptions.length;
+    }
+
     const options = allOptions;
-    console.log("redraw", options.length);
+    console.log(
+      "🎨 redraw",
+      options.length,
+      angleScale.domain(),
+      angleScale.range(),
+      props.optionSel,
+      hashNamesDrawn
+    );
+
+    width = resultRef.current.clientWidth;
+    // height = resultRef.current.clientHeight;
+
+    console.log("width", width, "height", height);
 
     const svg = d3
       .select(resultRef.current)
@@ -135,14 +145,8 @@ const Lottery = (props) => {
 
     const optionsSel = svg.selectAll(".option").data(options, (d) => d.id);
 
-    const opEnter = optionsSel
-      .enter()
-      .append("text")
-      .classed("option", "true")
-      .classed("drawn", (d) => hashNamesDrawn[d.name]);
-
     const translate = (sel) =>
-      sel.attr("transform", function(d) {
+      sel.attr("transform", function (d) {
         return (
           "translate(" +
           (width / 2 - 2 * options.length) +
@@ -151,34 +155,28 @@ const Lottery = (props) => {
           ") rotate(" +
           angleScale(d.id) +
           ")" +
-          ", translate(" +
+          " translate(" +
           2 * options.length +
           ",0)"
         );
       });
 
     optionsSel
-      .merge(opEnter)
-      // .attr("x", width/2)
-      // .attr("y", height/2)
-      .attr("id", function(d) {
-        // console.log("id", d, dCounts, dCounts.get(d.name));
-        return "id" + d.id;
-      })
+      .join("text")
+      .classed("option", "true")
+      .classed("drawn", (d) => avoidRepetition && hashNamesDrawn[d.name])
+      .classed("selected", (d) => d.id === props.optionSel?.id)
+      .attr("id", (d) => "id" + d.id)
       .attr("key", (d) => d.id)
-      .classed("drawn", (d) => hashNamesDrawn[d.name])
-      .text((d) => `${d.name} ${dCounts.get(d.name)?.count}`)
+      .text((d) => `${d.name} ${dCounts.get(d.name)?.count - 1}`)
       .transition()
       .duration(1000)
       .call(translate);
-
-    optionsSel.exit().remove();
   }
 
   function onChoose() {
     const sel = Math.floor(Math.random() * optionsLeft.length);
     const tmpOptionSel = optionsLeft.splice(sel, 1)[0];
-    console.log("onChoose", sel, "options left", optionsLeft.length, "angleScale", angleScale.domain(), angleScale.range());
 
     if (tmpOptionSel === undefined) {
       console.log("No more options left");
@@ -188,20 +186,22 @@ const Lottery = (props) => {
 
     tmpOptionSel.drawn = true;
 
-    angleScale.range([0, endAngle]);
+    // angleScale.range([0, endAngle]);
     const selAngle = angleScale(tmpOptionSel.id);
 
+    const prevRange = angleScale.range();
     console.log(
-      "sel=" + sel + " angle=" + selAngle + " option " + tmpOptionSel.name
+      "🚫 Changing angle scale from ",
+      angleScale.range(),
+      " to ",
+      [prevRange[0] - selAngle, prevRange[1] - selAngle],
+      prevRange[1] - selAngle - (prevRange[0] - selAngle)
     );
+    angleScale.range([prevRange[0] - selAngle, prevRange[1] - selAngle]);
 
-    angleScale.range([-selAngle, endAngle - selAngle]);
-    console.log("#id " + sel);
-    d3.selectAll(".option").classed("selected", false);
-    
-
-    console.log("#id" + tmpOptionSel.id);
-    d3.select("#id" + tmpOptionSel.id).classed("selected", true);
+    // Should be done in redraw
+    // d3.selectAll(".option").classed("selected", false);
+    // d3.select("#id" + tmpOptionSel.id).classed("selected", true);
 
     props.setOptionSel(tmpOptionSel);
     // setOptionsDrawn([tmpOptionSel].concat(optionsDrawn));
@@ -224,7 +224,7 @@ const Lottery = (props) => {
   // Do only once
   useEffect(() => {
     redraw();
-  }, [props.options, adjust, props]);
+  }, [props.options, adjust, props, avoidRepetition]);
 
   // console.log("Lottery Render, counts", props.counts, " adjust ", adjust);
   return (
@@ -271,6 +271,7 @@ Lottery.propTypes = {
   optionsDrawn: PropTypes.array.isRequired,
   todayGrades: PropTypes.array.isRequired,
   counts: PropTypes.array.isRequired,
+  optionSel: PropTypes.object,
 };
 
 export default Lottery;

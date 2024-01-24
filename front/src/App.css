@@ -7,7 +7,7 @@ button {
 }
 #result {
   font-size: 50pt;
-  width: 50%;
+  width: 100%;
   float: left;
 }
 #drawnBox {
