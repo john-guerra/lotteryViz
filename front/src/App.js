@@ -10,9 +10,8 @@ import { classes } from "./students.mjs";
 
 // https://stackoverflow.com/questions/24468518/html5-input-datetime-local-default-value-of-today-and-current-time
 // https://stackoverflow.com/questions/10830357/javascript-toisostring-ignores-timezone-offset
-function toLocalIsoString(date) {
-  const tzoffset = date.getTimezoneOffset() * 60000; //offset in milliseconds
-  const localDate = new Date(date - tzoffset);
+function toLocaleIsoString(date) {
+  const localDate = new Date(date - date.getTimezoneOffset() * 60000); //offset in milliseconds. Credit https://stackoverflow.com/questions/10830357/javascript-toisostring-ignores-timezone-offset
 
   // Optionally remove second/millisecond if needed
   localDate.setSeconds(null);
@@ -156,10 +155,10 @@ const App = () => {
 
   const renderCourseSelector = () => {
     return (
-      <div>
+      <div className="mb-3"> 
         <label>
           Course:{" "}
-          <select name="course" onChange={onChangeCourse}>
+          <select className="form-control" name="course" onChange={onChangeCourse}>
             {Object.keys(classes).map((c) => (
               <option value={c} key={c}>
                 {c}
@@ -183,27 +182,7 @@ const App = () => {
     setSelectedDate(new Date(evt.target.value));
   };
 
-  console.log(
-    "🎨 App render grades",
-    selectedDate.toLocaleString(),
-    optionSel,
-    "counts",
-    counts,
-    "selectedDate",
-    selectedDate,
-    "useCustomDate",
-    useCustomDate,
-    "course",
-    course,
-    "dayGrades",
-    dayGrades,
-    "options",
-    options,
-    "search",
-    search,
-    "lastOptionSel",
-    lastOptionSel
-  );
+  
   return (
     <div className="App">
       {" "}
@@ -227,13 +206,14 @@ const App = () => {
         {/* /col-5  lottery */}
 
         <div className="col-7">
-          <div>
+          <div className="mb-1">
             {" "}
             <br /> <br />{" "}
-            <label>
+            <label className="form-label">
               {" "}
               Search{" "}
               <input
+                className="form-control"
                 type="text"
                 ref={inSearch}
                 value={search}
@@ -282,7 +262,7 @@ const App = () => {
                   <input
                     className="form-control"
                     type="datetime-local"
-                    value={toLocalIsoString(selectedDate)}
+                    value={toLocaleIsoString(selectedDate)}
                     onInput={onChangeDate}
                   ></input>
                 </label>{" "}
