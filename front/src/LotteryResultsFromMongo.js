@@ -43,6 +43,8 @@ function LotteryResultsFromMongo({
     notebook.redefine("width", width);
     notebook.redefine("defaultCourse", courseName);
 
+    console.log("courseName", viewofCourseNameRef.current);
+
     return () => runtime.dispose();
   }, [width, courseName, optionsDrawn]);
 

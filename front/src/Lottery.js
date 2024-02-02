@@ -229,8 +229,8 @@ const Lottery = (props) => {
   // console.log("Lottery Render, counts", props.counts, " adjust ", adjust);
   return (
     <div className="Lottery">
-      <div>
-        <button id="btnChoose" onClick={onChoose}>
+      <div className="mb-2">
+        <button className="btn-outline-primary btn" id="btnChoose" onClick={onChoose}>
           Do you feel lucky?
         </button>
 
@@ -238,10 +238,10 @@ const Lottery = (props) => {
       </div>
       <div>
         {" "}
-        <label>
+        <label className="form-check-label">
           {" "}
           Adjust chances by history
-          <input
+          <input className="form-check-input mx-1"
             onChange={onAdjustByHistory}
             checked={adjust}
             type="checkbox"
@@ -250,10 +250,10 @@ const Lottery = (props) => {
       </div>
       <div>
         {" "}
-        <label>
+        <label className="form-check-label">
           {" "}
           Avoid repetition
-          <input
+          <input className="form-check-input mx-1"
             onChange={onAvoidRepetition}
             checked={avoidRepetition}
             type="checkbox"
