@@ -1,4 +1,3 @@
-
 import mongodb from "mongodb";
 import assert from "assert";
 
@@ -11,7 +10,7 @@ function deleteGrade(grade, cbk) {
   dbName = "lottery_" + grade.course;
 
   const client = new MongoClient(url, { useUnifiedTopology: true });
-  client.connect(function(err) {
+  client.connect(function (err) {
     assert.equal(null, err);
     console.log("Connected successfully to server");
 
@@ -33,7 +32,7 @@ function deleteGrade(grade, cbk) {
         timestamp: grade.timestamp,
         course: grade.course,
       },
-      function(err, res) {
+      function (err, res) {
         if (err) {
           console.log("error deleting");
         } else {
@@ -51,8 +50,8 @@ function deleteGrade(grade, cbk) {
 function setGrade(grade, cbk) {
   dbName = "lottery_" + grade.course;
 
-  const client = new MongoClient(url);
-  client.connect(function(err) {
+  const client = new MongoClient(url, { useUnifiedTopology: true });
+  client.connect(function (err) {
     assert.equal(null, err);
     console.log("Connected successfully to server");
 
@@ -60,11 +59,9 @@ function setGrade(grade, cbk) {
 
     // Convert the timestamp to date
 
-    grade.timestamp =
-      grade.timestamp !== undefined ? new Date(grade.timestamp) : undefined;
+    grade.timestamp = grade.timestamp ? new Date(grade.timestamp) : new Date();
 
-    const timestamp = new Date();
-    const date = timestamp.toDateString();
+    const date = grade.timestamp.toDateString();
 
     // If grade.timestamp exists we are updating
     grades.update(
@@ -76,13 +73,13 @@ function setGrade(grade, cbk) {
       },
       {
         date: date,
-        timestamp: grade.timestamp || timestamp,
+        timestamp: grade.timestamp || grade.timestamp,
         name: grade.name,
         grade: grade.grade,
         course: grade.course,
       },
       { upsert: true },
-      function(res) {
+      function (res) {
         console.log("Mongo successfully updated", res);
         cbk.apply(this, arguments);
         client.close();
@@ -91,21 +88,20 @@ function setGrade(grade, cbk) {
   });
 }
 
-function getGrades(course, cbk) {
+function getGrades({ course, date = new Date() } = {}, cbk) {
   dbName = "lottery_" + course;
 
-  const client = new MongoClient(url);
-  client.connect(function(err) {
+  const client = new MongoClient(url, { useUnifiedTopology: true });
+  client.connect(function (err) {
     assert.equal(null, err);
     console.log("Connected successfully to server");
 
     const grades = client.db(dbName).collection("grades");
 
-    const timestamp = new Date();
-    const date = timestamp.toDateString();
+    console.log("myDB.getGrades", course, date.toDateString());
     grades
       .find({
-        date: date,
+        date: date.toDateString(),
       })
       .sort({ timestamp: -1 })
       .toArray((err, grades) => {
@@ -122,8 +118,8 @@ function getGrades(course, cbk) {
 function getAllGrades(course, cbk) {
   dbName = "lottery_" + course;
 
-  const client = new MongoClient(url);
-  client.connect(function(err) {
+  const client = new MongoClient(url, { useUnifiedTopology: true });
+  client.connect(function (err) {
     assert.equal(null, err);
     console.log("Connected successfully to server");
 
@@ -146,8 +142,8 @@ function getAllGrades(course, cbk) {
 function getCounts(course, cbk) {
   dbName = "lottery_" + course;
 
-  const client = new MongoClient(url);
-  client.connect(function(err) {
+  const client = new MongoClient(url, { useUnifiedTopology: true });
+  client.connect(function (err) {
     assert.equal(null, err);
     console.log("Connected successfully to server");
 
