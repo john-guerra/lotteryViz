@@ -4,73 +4,8 @@ import * as d3 from "d3";
 
 import "./ListSelected.css";
 
-function sendPost(url, body) {
-  const strGrade = JSON.stringify(body);
-  console.log("send grade", strGrade);
-
-  // Default options are marked with *
-  return fetch(url, {
-    method: "POST", // *GET, POST, PUT, DELETE, etc.
-    mode: "cors", // no-cors, *cors, same-origin
-    cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
-    credentials: "same-origin", // include, *same-origin, omit
-    headers: {
-      "Content-Type": "application/json"
-      // 'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    redirect: "follow", // manual, *follow, error
-    referrerPolicy: "no-referrer", // no-referrer, *client
-    // body: "" // body data type must match "Content-Type" header
-    body: strGrade // body data type must match "Content-Type" header
-  }).then(res => res.json());
-}
-
-const ListSelected = props => {
+const ListSelected = (props) => {
   console.log("ListSelected", props);
-
-  function sendGrade(name, grade, timestamp) {
-    return sendPost("setGrade", { name, grade, timestamp, course: props.course}).then(res => {
-      props.onSelect(res);
-
-      return res;
-    });
-  }
-
-  function sendDelete(name, grade, timestamp) {
-    if (
-      window.confirm(
-        `Do you really want to delete? ${name} ${grade} ${timestamp}`
-      )
-    ) {
-      sendPost("delete", { name, grade, timestamp, course: props.course }).then(res => {
-        console.log("delete response", res);
-        props.onSelect();
-
-        return res;
-      });
-    }
-  }
-
-  if (props.optionSel) {
-    d3.select("body").on("keyup", () => {
-      switch (d3.event.key) {
-        case "-":
-          sendGrade(props.optionSel.name, -1, Date.now());
-          break;
-        case "0":
-          sendGrade(props.optionSel.name, 0, Date.now());
-          break;
-        case "1":
-          sendGrade(props.optionSel.name, 1, Date.now());
-          break;
-        case "2":
-          sendGrade(props.optionSel.name, 2, Date.now());
-          break;
-        default:
-          break;
-      }
-    });
-  }
 
   function renderOptions() {
     return props.optionsDrawn.map((option, i) => (
@@ -81,31 +16,41 @@ const ListSelected = props => {
           {option.grade !== null ? option.grade : "_"}
         </span>
         <button
-          onClick={() => sendGrade(option.name, -1, option.timestamp, props.course)}
+          onClick={() =>
+            props.sendGrade(option.name, -1, option.timestamp, props.course)
+          }
           className="btnMinusOne"
         >
           -1
         </button>
         <button
-          onClick={() => sendGrade(option.name, 0, option.timestamp, props.course)}
+          onClick={() =>
+            props.sendGrade(option.name, 0, option.timestamp, props.course)
+          }
           className="btnZero"
         >
           0
         </button>
         <button
-          onClick={() => sendGrade(option.name, 1, option.timestamp, props.course)}
+          onClick={() =>
+            props.sendGrade(option.name, 1, option.timestamp, props.course)
+          }
           className="btnOne"
         >
           1
         </button>
         <button
-          onClick={() => sendGrade(option.name, 2, option.timestamp, props.course)}
+          onClick={() =>
+            props.sendGrade(option.name, 2, option.timestamp, props.course)
+          }
           className="btnTwo"
         >
           2
         </button>
         <button
-          onClick={() => sendDelete(option.name, 2, option.timestamp, props.course)}
+          onClick={() =>
+            props.sendDelete(option.name, 2, option.timestamp, props.course)
+          }
           className="btnDelete"
         >
           ❌
@@ -120,7 +65,9 @@ const ListSelected = props => {
 ListSelected.propTypes = {
   course: PropTypes.string.isRequired,
   optionsDrawn: PropTypes.array.isRequired,
-  onSelect: PropTypes.func.isRequired
+  onSelect: PropTypes.func.isRequired,
+  sendGrade: PropTypes.func.isRequired,
+  sendDelete: PropTypes.func.isRequired,
 };
 
 export default ListSelected;

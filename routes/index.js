@@ -16,7 +16,7 @@ import { classes } from "../front/src/students.mjs";
 
 // STUDENT LIST GOES INTO front/src/students.mjs
 
-router.post("/setGrade", function(req, res) {
+router.post("/setGrade", function (req, res) {
   console.log("***setGrade", req.ip, req.body);
 
   if (req.ip !== "127.0.0.1") {
@@ -30,7 +30,7 @@ router.post("/setGrade", function(req, res) {
   });
 });
 
-router.post("/delete", function(req, res) {
+router.post("/delete", function (req, res) {
   console.log("*** delete", req.ip);
 
   if (req.ip !== "127.0.0.1") {
@@ -43,10 +43,12 @@ router.post("/delete", function(req, res) {
   });
 });
 
-router.get("/getGrades/:course", function(req, res) {
-  console.log("getGrades");
+router.get("/getGrades/:course", function (req, res) {
+  const date = req.query.date ? new Date(+req.query.date) : new Date();
+  const course = req.params.course;
+  console.log("📆 getGrades", course, date, req.query.date, new Date(req.query.date));
 
-  myDB.getGrades(req.params.course, (grades) => {
+  myDB.getGrades({ course, date }, (grades) => {
     console.log("Got grades!");
     res.json(grades);
   });
@@ -61,7 +63,7 @@ const corsOptions = {
   optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
 };
 
-router.get("/getAllGrades/:course", cors(corsOptions), function(req, res) {
+router.get("/getAllGrades/:course", cors(corsOptions), function (req, res) {
   console.log("getAllGrades");
 
   myDB.getAllGrades(req.params.course, (grades) => {
@@ -76,7 +78,7 @@ router.get("/getAllGrades/:course", cors(corsOptions), function(req, res) {
   });
 });
 
-router.get("/getCounts/:course", cors(corsOptions), function(req, res) {
+router.get("/getCounts/:course", cors(corsOptions), function (req, res) {
   console.log("getCounts");
 
   myDB.getCounts(req.params.course, (counts) => {
