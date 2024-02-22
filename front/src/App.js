@@ -138,7 +138,7 @@ const App = () => {
     }
     const reg = new RegExp(`.*${searchedStr}.*`, "i");
     const matches = options.find((o) => reg.test(o));
-    console.log("matches", matches);
+    console.log("matches", matches, options);
     if (matches) {
       setLastOptionSel(optionSel);
       setOptionSel({ name: matches });
@@ -200,7 +200,7 @@ const App = () => {
             optionsDrawn={dayGrades}
             optionSel={optionSel}
             counts={counts}
-            dayGrades={dayGrades}
+            dayGrades={dayGrades}          
           ></Lottery>
         </div>
         {/* /col-5  lottery */}
