@@ -85,7 +85,7 @@ export const classes = {
     "Dsouza, Ethan I.",
     "Emily chooi, Kai",
     "Hill, Zachary D.",
-    "Hong, Leechan",
+    // "Hong, Leechan", // Feb 3
     "Johnson, Aaron N.",
     "Kalae, Youssef",
     "Kawano, Sena",
