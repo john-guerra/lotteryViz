@@ -21,13 +21,14 @@ import "./Lottery.css";
 
 // Initial range values pending number of options
 const angleScale = d3.scaleLinear().range([0, 0]);
-let prevOptionsLength = null;
+let resetAngleScale = true;
 
 const Lottery = (props) => {
-  const ADJUSTMENT_FACTOR = 10;
+  const ADJUSTMENT_FACTOR = 30;
 
   let [adjust, setAdjust] = useState(true);
   let [avoidRepetition, setAvoidRepetition] = useState(true);
+  let [adjustByVariable, setAdjustByVariable] = useState("sum");
   const resultRef = useRef();
 
   const dCounts = getDCounts();
@@ -87,19 +88,28 @@ const Lottery = (props) => {
 
     // Start from the counts in the database. Use dCounts as it has only the ones registered
     let sortedCounts = Array.from(dCounts.values()).sort(
-      (a, b) => a.count - b.count
+      (a, b) => a[adjustByVariable] - b[adjustByVariable]
     );
 
-    const maxCount = sortedCounts.at(-1).count;
+    // console.log(
+    //   "getOptionsFromCounts",
+    //   sortedCounts,
+    //   "options",
+    //   props.options,
+    //   dCounts
+    // );
+
+    const maxCount = sortedCounts.at(-1)[adjustByVariable];
     const adjustedCounts = sortedCounts.map((d) => {
-      d.adjustedCount = (maxCount - d.count) * ADJUSTMENT_FACTOR + 1;
+      d.adjustedCount =
+        (maxCount - d[adjustByVariable]) * ADJUSTMENT_FACTOR + 1;
       return d;
     });
     const res = adjustedCounts
       .map((d) => Array.from({ length: d.adjustedCount }).map((_) => d._id))
       .flat();
 
-    // console.log("Options from counts", res);
+    // console.log("👀👀 Options from counts", res);
 
     return res;
   }
@@ -115,9 +125,12 @@ const Lottery = (props) => {
   // Redraw
   function redraw() {
     angleScale.domain([0, allOptions.length - 1]);
-    if (prevOptionsLength !== allOptions.length) {
+    // First run
+    if (resetAngleScale) {
+      // console.log("📢 Resetting angle scale", prevOptionsLength, allOptions.length);
       angleScale.range([0, 360 - 360 / allOptions.length]);
-      prevOptionsLength = allOptions.length;
+      // prevOptionsLength = allOptions.length;
+      resetAngleScale = false;
     }
 
     const options = allOptions;
@@ -184,6 +197,7 @@ const Lottery = (props) => {
       return;
     }
 
+  
     tmpOptionSel.drawn = true;
 
     // angleScale.range([0, endAngle]);
@@ -206,16 +220,26 @@ const Lottery = (props) => {
     props.setOptionSel(tmpOptionSel);
     // setOptionsDrawn([tmpOptionSel].concat(optionsDrawn));
 
+    console.log("onChoose", dCounts.get(tmpOptionSel.name));
+
     redraw();
   }
 
   function onAdjustByHistory(evt) {
+    resetAngleScale = true;
     setAdjust(evt.target.checked);
 
     console.log("adjust", adjust);
   }
 
+  function onAdjustByVariable(evt) {
+    resetAngleScale = true;
+    console.log("adjustByVariable", evt.target.value);
+    setAdjustByVariable(evt.target.value);
+  }
+
   function onAvoidRepetition(evt) {
+    resetAngleScale = true;
     setAvoidRepetition(evt.target.checked);
 
     console.log("avoidRepetition", adjust);
@@ -224,39 +248,81 @@ const Lottery = (props) => {
   // Do only once
   useEffect(() => {
     redraw();
-  }, [props.options, adjust, props, avoidRepetition]);
+  }, [
+    props.options,
+    adjust,
+    props,
+    avoidRepetition,
+    adjustByVariable,
+    props.optionSel,
+  ]);
 
   // console.log("Lottery Render, counts", props.counts, " adjust ", adjust);
   return (
     <div className="Lottery">
       <div className="mb-2">
-        <button className="btn-outline-primary btn" id="btnChoose" onClick={onChoose}>
+        <button
+          className="btn-outline-primary btn"
+          id="btnChoose"
+          onClick={onChoose}
+        >
           Do you feel lucky?
         </button>
 
         <small>Options left: {optionsLeft.length}</small>
       </div>
-      <div>
+      <div className="form-check">
         {" "}
         <label className="form-check-label">
           {" "}
           Adjust chances by history
-          <input className="form-check-input mx-1"
+          <input
+            className="form-check-input mx-1"
             onChange={onAdjustByHistory}
             checked={adjust}
             type="checkbox"
           />
         </label>
       </div>
-      <div>
+      <div className="form-check">
         {" "}
         <label className="form-check-label">
           {" "}
           Avoid repetition
-          <input className="form-check-input mx-1"
+          <input
+            className="form-check-input mx-1"
             onChange={onAvoidRepetition}
             checked={avoidRepetition}
             type="checkbox"
+          />
+        </label>
+      </div>
+      <div className="form-check">
+        {" "}
+        Adjust by:
+        <label className="form-check-label mx-1">
+          {" "}
+          # Calls
+          <input
+            className="form-check-input mx-1"
+            onChange={onAdjustByVariable}
+            checked={adjustByVariable === "count"}
+            type="radio"
+            name="adjustBy"
+            id="count"
+            value="count"
+          />
+        </label>
+        <label className="form-check-label mx-1">
+          {" "}
+          Sum Points
+          <input
+            className="form-check-input mx-1"
+            onChange={onAdjustByVariable}
+            checked={adjustByVariable === "sum"}
+            type="radio"
+            name="adjustBy"
+            value="sum"
           />
         </label>
       </div>
@@ -269,7 +335,7 @@ Lottery.propTypes = {
   options: PropTypes.arrayOf(PropTypes.string).isRequired,
   setOptionSel: PropTypes.func.isRequired,
   optionsDrawn: PropTypes.array.isRequired,
-  todayGrades: PropTypes.array.isRequired,
+  dayGrades: PropTypes.array.isRequired,
   counts: PropTypes.array.isRequired,
   optionSel: PropTypes.object,
 };
