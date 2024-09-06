@@ -91,13 +91,7 @@ const Lottery = (props) => {
       (a, b) => a[adjustByVariable] - b[adjustByVariable]
     );
 
-    // console.log(
-    //   "getOptionsFromCounts",
-    //   sortedCounts,
-    //   "options",
-    //   props.options,
-    //   dCounts
-    // );
+    console.log("counts", sortedCounts);
 
     const maxCount = sortedCounts.at(-1)[adjustByVariable];
     const adjustedCounts = sortedCounts.map((d) => {
@@ -105,6 +99,7 @@ const Lottery = (props) => {
         (maxCount - d[adjustByVariable]) * ADJUSTMENT_FACTOR + 1;
       return d;
     });
+
     const res = adjustedCounts
       .map((d) => Array.from({ length: d.adjustedCount }).map((_) => d._id))
       .flat();
@@ -134,14 +129,7 @@ const Lottery = (props) => {
     }
 
     const options = allOptions;
-    console.log(
-      "🎨 redraw",
-      options.length,
-      angleScale.domain(),
-      angleScale.range(),
-      props.optionSel,
-      hashNamesDrawn
-    );
+    // // );
 
     width = resultRef.current.clientWidth;
     // height = resultRef.current.clientHeight;
@@ -197,7 +185,6 @@ const Lottery = (props) => {
       return;
     }
 
-  
     tmpOptionSel.drawn = true;
 
     // angleScale.range([0, endAngle]);
@@ -220,7 +207,7 @@ const Lottery = (props) => {
     props.setOptionSel(tmpOptionSel);
     // setOptionsDrawn([tmpOptionSel].concat(optionsDrawn));
 
-    console.log("onChoose", dCounts.get(tmpOptionSel.name));
+    console.log("onChoose", dCounts.get(tmpOptionSel.name).sum);
 
     redraw();
   }

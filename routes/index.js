@@ -31,13 +31,17 @@ router.post("/setGrade", function (req, res) {
 });
 
 router.post("/delete", function (req, res) {
-  console.log("*** delete", req.ip);
+  console.log("*** delete", req.ip, req.body);
 
   if (req.ip !== "127.0.0.1") {
     console.log("Request not from localhost ", req.ip, " ignoring");
   }
 
-  myDB.deleteGrade(req.body, () => {
+  myDB.deleteGrade(req.body, (err) => {
+    if (err) {
+      console.log("Error deleting", err);
+      return;
+    }
     console.log("Deleted!");
     res.json({ deleted: true });
   });
@@ -46,7 +50,13 @@ router.post("/delete", function (req, res) {
 router.get("/getGrades/:course", function (req, res) {
   const date = req.query.date ? new Date(+req.query.date) : new Date();
   const course = req.params.course;
-  console.log("📆 getGrades", course, date, req.query.date, new Date(req.query.date));
+  console.log(
+    "📆 getGrades",
+    course,
+    date,
+    req.query.date,
+    new Date(req.query.date)
+  );
 
   myDB.getGrades({ course, date }, (grades) => {
     console.log("Got grades!");
