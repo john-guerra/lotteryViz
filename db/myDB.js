@@ -6,45 +6,42 @@ const { MongoClient } = mongodb;
 let dbName = "lottery_db_spring2024";
 const url = process.env.MONGO_URL || "mongodb://localhost:27017";
 
-function deleteGrade(grade, cbk) {
+async function deleteGrade(grade, cbk) {
   dbName = "lottery_" + grade.course;
 
   const client = new MongoClient(url, { useUnifiedTopology: true });
-  client.connect(function (err) {
-    assert.equal(null, err);
+
+  try {
+    await client.connect();
+
     console.log("Connected successfully to server");
 
     const grades = client.db(dbName).collection("grades");
 
     // Convert the timestamp to date
-
     grade.timestamp =
-      grade.timestamp !== undefined ? new Date(grade.timestamp) : undefined;
+      grade.timestamp !== undefined ? new Date(grade.timestamp) : new Date();
 
-    const timestamp = new Date();
-    const date = timestamp.toDateString();
+    const date = grade.timestamp.toDateString();
+    const opts = {
+      name: grade.name,
+      date: date,
+      timestamp: grade.timestamp,
+      course: grade.course,
+    };
+    console.log("Deleting", opts);
+    const res = await grades.deleteOne(opts);
 
-    // If grade.timestamp exists we are updating
-    grades.deleteOne(
-      {
-        name: grade.name,
-        date: date,
-        timestamp: grade.timestamp,
-        course: grade.course,
-      },
-      function (err, res) {
-        if (err) {
-          console.log("error deleting");
-        } else {
-          console.log("Mongo successfully deleted", res.deletedCount);
-          if (res.deletedCount) {
-            cbk.apply(this, arguments);
-          }
-        }
-        client.close();
-      }
-    );
-  });
+    console.log("Mongo successfully deleted", res.deletedCount);
+    if (res.deletedCount) {
+      cbk();
+    }
+  } catch (err) {
+    console.log("Error deleting", err);
+    cbk(err);
+  } finally {
+    client.close();
+  }
 }
 
 function setGrade(grade, cbk) {
@@ -60,7 +57,6 @@ function setGrade(grade, cbk) {
     // Convert the timestamp to date
 
     grade.timestamp = grade.timestamp ? new Date(grade.timestamp) : new Date();
-
     const date = grade.timestamp.toDateString();
 
     // If grade.timestamp exists we are updating

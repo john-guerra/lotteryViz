@@ -9,7 +9,6 @@
     "postinstall": "cd front && npm install && npm run build"
   },
   "dependencies": {
-    "@john-guerra/lottery-results-from-mongo": "https://api.observablehq.com/@john-guerra/lottery-results-from-mongo.tgz@latest?v=3",
     "@observablehq/runtime": "5",
     "cookie-parser": "~1.4.4",
     "cors": "^2.8.5",
