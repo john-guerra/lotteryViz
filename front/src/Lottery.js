@@ -20,7 +20,7 @@ import * as d3 from "d3";
 import "./Lottery.css";
 
 // Initial range values pending number of options
-const angleScale = d3.scaleLinear().range([0, 0]);
+const angleScale = d3.scaleLinear().range([0, 360]);
 let resetAngleScale = true;
 
 const Lottery = (props) => {
@@ -119,35 +119,48 @@ const Lottery = (props) => {
 
   // Redraw
   function redraw() {
-    angleScale.domain([0, allOptions.length - 1]);
+    angleScale.domain([0, allOptions.length ]);
     // First run
     if (resetAngleScale) {
-      // console.log("📢 Resetting angle scale", prevOptionsLength, allOptions.length);
-      angleScale.range([0, 360 - 360 / allOptions.length]);
+      angleScale.range([0, 360 ]);
+      console.log(
+        "📢 Resetting angle scale",
+        allOptions.length,
+        angleScale.domain(),
+        angleScale.range()
+      );
       // prevOptionsLength = allOptions.length;
       resetAngleScale = false;
     }
 
+    console.log(
+      "🎨 Redraw angleScale",
+      allOptions.length,
+      angleScale.domain(),
+      angleScale.range(),
+    );
+
+
     const options = allOptions;
-    // // );
+    
 
     width = resultRef.current.clientWidth;
     // height = resultRef.current.clientHeight;
 
-    console.log("width", width, "height", height);
 
     const svg = d3
       .select(resultRef.current)
       .selectAll("svg")
       .data([options])
       .join("svg")
+      // .style("overflow", "visible")
       .attr("width", width)
       .attr("height", height);
 
     const optionsSel = svg.selectAll(".option").data(options, (d) => d.id);
 
     const translate = (sel) =>
-      sel.attr("transform", function (d) {
+      sel.attr("transform", function (d, i) {
         return (
           "translate(" +
           (width / 2 - 2 * options.length) +
