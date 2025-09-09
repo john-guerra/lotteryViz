@@ -3,7 +3,9 @@ import assert from "assert";
 
 const { MongoClient } = mongodb;
 
-let dbName = "lottery_db_spring2024";
+let dbName = "lottery_webdev_spring2025";
+
+
 const url = process.env.MONGO_URL || "mongodb://localhost:27017";
 
 async function deleteGrade(grade, cbk) {
@@ -90,7 +92,7 @@ function getGrades({ course, date = new Date() } = {}, cbk) {
   const client = new MongoClient(url, { useUnifiedTopology: true });
   client.connect(function (err) {
     assert.equal(null, err);
-    console.log("Connected successfully to server");
+    console.log("getGrades Connected successfully to server", course, date);
 
     const grades = client.db(dbName).collection("grades");
 
