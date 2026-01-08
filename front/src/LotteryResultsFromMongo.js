@@ -4,7 +4,7 @@ import notebookUrl from "@john-guerra/lottery-results-from-mongo";
 import PropTypes from "prop-types";
 
 function LotteryResultsFromMongo({
-  courseName = "pdp_spring_2024",
+  courseName = "webdev_fall_2025",
   optionsDrawn,
 }) {
   const viewofCourseNameRef = useRef();

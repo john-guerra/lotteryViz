@@ -3,13 +3,10 @@ import assert from "assert";
 
 const { MongoClient } = mongodb;
 
-let dbName = "lottery_webdev_spring2025";
-
-
 const url = process.env.MONGO_URL || "mongodb://localhost:27017";
 
 async function deleteGrade(grade, cbk) {
-  dbName = "lottery_" + grade.course;
+  const dbName = "lottery_" + grade.course;
 
   const client = new MongoClient(url, { useUnifiedTopology: true });
 
@@ -47,7 +44,7 @@ async function deleteGrade(grade, cbk) {
 }
 
 function setGrade(grade, cbk) {
-  dbName = "lottery_" + grade.course;
+  const dbName = "lottery_" + grade.course;
 
   const client = new MongoClient(url, { useUnifiedTopology: true });
   client.connect(function (err) {
@@ -87,7 +84,7 @@ function setGrade(grade, cbk) {
 }
 
 function getGrades({ course, date = new Date() } = {}, cbk) {
-  dbName = "lottery_" + course;
+  const dbName = "lottery_" + course;
 
   const client = new MongoClient(url, { useUnifiedTopology: true });
   client.connect(function (err) {
@@ -114,7 +111,7 @@ function getGrades({ course, date = new Date() } = {}, cbk) {
 }
 
 function getAllGrades(course, cbk) {
-  dbName = "lottery_" + course;
+  const dbName = "lottery_" + course;
 
   const client = new MongoClient(url, { useUnifiedTopology: true });
   client.connect(function (err) {
@@ -138,7 +135,7 @@ function getAllGrades(course, cbk) {
 }
 
 function getCounts(course, cbk) {
-  dbName = "lottery_" + course;
+  const dbName = "lottery_" + course;
 
   const client = new MongoClient(url, { useUnifiedTopology: true });
   client.connect(function (err) {
