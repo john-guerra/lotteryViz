@@ -61,3 +61,6 @@ typings/
 .next
 
 .DS_Store
+
+# Student data (privacy)
+front/src/students.mjs
