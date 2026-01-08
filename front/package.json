@@ -4,8 +4,8 @@
   "private": true,
   "dependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "@john-guerra/lottery-results-from-mongo": "https://api.observablehq.com/@john-guerra/lottery-results-from-mongo@latest.tgz?v=3",
-    "@observablehq/runtime": "5",
+    "@john-guerra/lottery-results-from-mongo": "https://api.observablehq.com/@john-guerra/lottery-results-from-mongo@87.tgz?v=3",
+    "@observablehq/runtime": "5.8",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",

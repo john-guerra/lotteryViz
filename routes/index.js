@@ -79,10 +79,16 @@ router.get("/getAllGrades/:course", cors(corsOptions), function (req, res) {
   myDB.getAllGrades(req.params.course, (grades) => {
     console.log("Got grades for course!", req.params.course);
 
+    if (!classes[req.params.course]) {
+      console.log("❌❌❌ No class list for course", req.params.course);
+    }
+
     res.json(
       grades.filter(
         (g) =>
-          !FILTER_BY_REGISTERED || classes[req.params.course].includes(g.name)
+          !FILTER_BY_REGISTERED ||
+          (classes[req.params.course] &&
+            classes[req.params.course].includes(g.name))
       )
     );
   });
