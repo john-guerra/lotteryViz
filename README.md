@@ -14,7 +14,7 @@ yarn install
 yarn start
 ```
 
-Front should be running in ports 4000 (front) and 4001 (back)
+The frontend should be running on port 3000, and the backend on port 4001.
 
 # Configuring students
 
