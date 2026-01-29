@@ -82,7 +82,7 @@ async function confirm(message) {
 /**
  * Award points to a student using direct MongoDB insert
  */
-async function awardPoints(studentName, course, points, reason) {
+async function awardPoints(studentName, course, points, reason, postDate) {
   const dbName = "lottery_" + course;
   const client = new MongoClient(mongoUrl, { useUnifiedTopology: true });
 
@@ -90,12 +90,11 @@ async function awardPoints(studentName, course, points, reason) {
     await client.connect();
     const grades = client.db(dbName).collection("grades");
 
-    const timestamp = new Date();
-    const date = timestamp.toDateString();
+    const date = postDate.toDateString();
 
     await grades.insertOne({
       date,
-      timestamp,
+      timestamp: postDate,
       name: studentName,
       grade: points,
       course,
@@ -280,8 +279,8 @@ async function main() {
   console.log(`    grade: ${options.points},`);
   console.log(`    course: "${options.course}",`);
   console.log(`    reason: "${reason}",`);
-  console.log(`    date: "<current date>",`);
-  console.log(`    timestamp: <current timestamp>`);
+  console.log(`    date: "${parentDate.toDateString()}",`);
+  console.log(`    timestamp: ${parentDate.toISOString()}`);
   console.log(`  }`);
   console.log("");
 
@@ -313,7 +312,7 @@ async function main() {
   console.log("=== AWARDING POINTS ===\n");
   let awardedCount = 0;
   for (const { slackName, rosterName } of matched) {
-    const success = await awardPoints(rosterName, options.course, options.points, reason);
+    const success = await awardPoints(rosterName, options.course, options.points, reason, parentDate);
     if (success) {
       console.log(`\u2713 Awarded ${options.points} point(s) to: ${rosterName}`);
       awardedCount++;
