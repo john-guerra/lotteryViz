@@ -4,19 +4,21 @@ import LotteryChart from "./LotteryChart";
 
 function LotteryResultsFromMongo({
   grades,
-  curve = "basis",
+  roster = null,
   rangeOpacity = 0.6,
   showStudentLines = false,
   studentCode = "",
+  studentName = "",
 }) {
   return (
     <div className="w-100">
       <LotteryChart
         grades={grades || []}
-        curve={curve}
+        roster={roster}
         rangeOpacity={rangeOpacity}
         showStudentLines={showStudentLines}
         studentCode={studentCode}
+        studentName={studentName}
       />
     </div>
   );
@@ -24,10 +26,11 @@ function LotteryResultsFromMongo({
 
 LotteryResultsFromMongo.propTypes = {
   grades: PropTypes.array,
-  curve: PropTypes.string,
+  roster: PropTypes.array,
   rangeOpacity: PropTypes.number,
   showStudentLines: PropTypes.bool,
   studentCode: PropTypes.string,
+  studentName: PropTypes.string,
 };
 
 export default LotteryResultsFromMongo;

@@ -1,11 +1,10 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useMemo, useState } from "react";
 import * as d3 from "d3";
 import PropTypes from "prop-types";
+import { useSelection } from "../context/SelectionContext";
+import { calculateMedian } from "../LotteryChart";
 
 
-/**
- * Group array by key function (d3 v5 compatible replacement for d3.group)
- */
 function groupBy(array, keyFn) {
   const map = new Map();
   for (const item of array) {
@@ -18,45 +17,6 @@ function groupBy(array, keyFn) {
   return map;
 }
 
-/**
- * Calculate the median of accumulated points across all students.
- * This is exported so App.js can use the same calculation for the header.
- * @param {Array} grades - Array of grade objects
- * @param {Array} roster - Optional array of student names to filter to
- */
-export function calculateMedian(grades, roster = null) {
-  if (!grades || !grades.length) return 0;
-
-  const rosterSet = roster ? new Set(roster) : null;
-
-  // Group by student and calculate total accumulated points
-  const byStudent = groupBy(grades, (d) => d.name);
-  const studentTotals = [];
-
-  for (const [name, studentGrades] of byStudent) {
-    // Skip if not in roster
-    if (rosterSet && !rosterSet.has(name)) continue;
-
-    const total = studentGrades.reduce((sum, g) => sum + g.grade, 0);
-    studentTotals.push(total);
-  }
-
-  // Include roster students with 0 points
-  if (roster) {
-    const studentsWithGrades = new Set(byStudent.keys());
-    for (const name of roster) {
-      if (!studentsWithGrades.has(name)) {
-        studentTotals.push(0);
-      }
-    }
-  }
-
-  return d3.median(studentTotals) || 0;
-}
-
-/**
- * Format a timestamp to a date string for grouping
- */
 function formatDate(timestamp) {
   const date = new Date(timestamp);
   return date.toLocaleDateString("en-US", {
@@ -65,25 +25,16 @@ function formatDate(timestamp) {
   });
 }
 
-/**
- * Build accumulated points per student per date from raw grades
- * @param {Array} grades - Array of grade objects
- * @param {Array} roster - Optional array of student names to filter to
- */
 function buildAccumPoints(grades, roster = null) {
   if (!grades || !grades.length) return { accumPoints: [], dates: [], studentIdMap: {} };
 
-  // Parse timestamps
   const processed = grades.map((g) => ({
     ...g,
     parsedDate: new Date(g.timestamp),
     dateStr: formatDate(g.timestamp),
   }));
 
-  // Sort by date
   processed.sort((a, b) => a.parsedDate - b.parsedDate);
-
-  // Get unique dates in order
   const uniqueDates = [...new Set(processed.map((g) => g.dateStr))];
 
   // Date string to timestamp map (use first occurrence)
@@ -147,9 +98,6 @@ function buildAccumPoints(grades, roster = null) {
   return { accumPoints: results, dates: uniqueDates, studentIdMap };
 }
 
-/**
- * Calculate percentiles (deciles) per date
- */
 function buildDecilesByDate(accumPoints, dates, n = 50, adjustment = 0) {
   const byDate = groupBy(accumPoints, (d) => d.date);
   const decilesNumbers = d3.range(0, 100 + 100 / n, 100 / n);
@@ -168,76 +116,84 @@ function buildDecilesByDate(accumPoints, dates, n = 50, adjustment = 0) {
   });
 }
 
-// Fixed internal dimensions for D3 calculations
 const WIDTH = 800;
 const HEIGHT = 450;
 
-function LotteryChart({
-  grades,
-  roster = null,
-  rangeOpacity = 0.6,
-  showStudentLines = false,
-  studentCode = "",
-  studentName = "",
-}) {
+function AdminLotteryChart({ grades, roster = null, rangeOpacity = 0.6, onStudentIdMapReady, studentName = "" }) {
   const svgRef = useRef();
+  const brushRef = useRef();
+  const { selectedStudents, highlightedStudent, setSelectionFromBrush, setHighlightedStudent, toggleStudent } = useSelection();
+  const [hoveredTickStudent, setHoveredTickStudent] = useState(null);
+
+  const { accumPoints, dates, studentIdMap } = useMemo(() => {
+    return buildAccumPoints(grades, roster);
+  }, [grades, roster]);
+
+  // Notify parent of studentIdMap when it changes
+  useEffect(() => {
+    if (onStudentIdMapReady && Object.keys(studentIdMap).length > 0) {
+      onStudentIdMapReady(studentIdMap);
+    }
+  }, [studentIdMap, onStudentIdMapReady]);
+
+  // Get final accumulated points per student for brush selection
+  const studentFinalAccum = useMemo(() => {
+    if (!accumPoints.length) return [];
+
+    const byStudent = groupBy(accumPoints, (d) => d.ID);
+    return Array.from(byStudent, ([id, records]) => {
+      const sorted = [...records].sort((a, b) => a.parsedDate - b.parsedDate);
+      const lastRecord = sorted[sorted.length - 1];
+      return {
+        id,
+        name: lastRecord.name,
+        finalAccum: lastRecord.accum,
+      };
+    });
+  }, [accumPoints]);
+
+  // Resolve studentName to ID
+  const searchedStudentId = useMemo(() => {
+    if (!studentName || !studentIdMap) return null;
+    // Exact match first
+    if (studentIdMap[studentName]) return studentIdMap[studentName];
+    // Case-insensitive partial match
+    const lowerName = studentName.toLowerCase();
+    const matchedName = Object.keys(studentIdMap).find(name =>
+      name.toLowerCase().includes(lowerName)
+    );
+    return matchedName ? studentIdMap[matchedName] : null;
+  }, [studentName, studentIdMap]);
 
   useEffect(() => {
-    if (!grades || !grades.length) return;
+    if (!grades || !grades.length || !accumPoints.length || !dates.length) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    // Margins and dimensions
-    const margin = { top: 20, right: 100, bottom: 70, left: 60 };
+    const margin = { top: 20, right: 120, bottom: 70, left: 60 };
     const iwidth = WIDTH - margin.left - margin.right;
     const iheight = HEIGHT - margin.top - margin.bottom;
-
-    // Build data
-    const { accumPoints, dates, studentIdMap } = buildAccumPoints(grades, roster);
-
-    // Resolve studentName to studentCode if provided
-    let resolvedStudentCode = studentCode;
-    if (studentName && studentIdMap[studentName]) {
-      resolvedStudentCode = studentIdMap[studentName];
-    } else if (studentName && !studentCode) {
-      // Try case-insensitive partial match
-      const lowerName = studentName.toLowerCase();
-      const matchedName = Object.keys(studentIdMap).find(name =>
-        name.toLowerCase().includes(lowerName)
-      );
-      if (matchedName) {
-        resolvedStudentCode = studentIdMap[matchedName];
-      }
-    }
-    if (!accumPoints.length || !dates.length) return;
 
     const n = 50;
     const adjustment = 0;
     const decilesByDate = buildDecilesByDate(accumPoints, dates, n, adjustment);
     const decilesNumbers = d3.range(0, 100 + 100 / n, 100 / n);
 
-    // Nested data structures
     const nestedAccumPoints = groupBy(accumPoints, (d) => d.date);
     const nestedAccumPointsByID = groupBy(accumPoints, (d) => d.ID);
 
-    // Scales
     const x = d3.scalePoint().domain(dates).range([0, iwidth]);
     const y = d3
       .scaleLinear()
-      .domain([-adjustment, d3.max(accumPoints, (d) => d.accum)])
+      .domain([0, d3.max(accumPoints, (d) => d.accum)])
       .nice()
       .range([iheight, 0]);
 
-    // Color scales
-    const riskRangeColor = d3
-      .scaleSequential(d3.interpolateRdBu)
-      .domain([-20, 120]);
-    const boxColor = d3
-      .scaleSequential(d3.interpolatePiYG)
-      .domain([-6, 6]);
+    const riskRangeColor = d3.scaleSequential(d3.interpolateRdBu).domain([-20, 120]);
+    const boxColor = d3.scaleSequential(d3.interpolatePiYG).domain([-6, 6]);
 
-    // Line/area generators - basis for background, monotoneX for student lines
+    // Basis for background curves, monotoneX for student lines
     const backgroundCurve = d3.curveBasis;
     const studentCurve = d3.curveMonotoneX;
 
@@ -260,7 +216,6 @@ function LotteryChart({
       .x((d) => x(d.date))
       .curve(studentCurve);
 
-    // Helper function to get decile ranges
     function getDecilesRange(i) {
       return decilesByDate.map(([date, deciles]) => ({
         date,
@@ -269,35 +224,18 @@ function LotteryChart({
       }));
     }
 
-    // Set up SVG with viewBox for responsive sizing
     svg
       .attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`)
       .attr("preserveAspectRatio", "xMidYMid meet")
       .style("width", "100%")
       .style("min-height", "40vh")
-      .style("max-height", "60vh")
-      .style("overflow", "visible");
+      .style("max-height", "60vh");
 
-    // Add gradient definition
-    const defs = svg.append("defs");
-    const gradient = defs
-      .append("linearGradient")
-      .attr("id", "riskGradient")
-      .attr("gradientTransform", "rotate(90)");
-
-    d3.range(0, 10).forEach((s) => {
-      gradient
-        .append("stop")
-        .attr("stop-color", riskRangeColor(s * 10))
-        .attr("offset", `${s * 10}%`);
-    });
-
-    // Main drawing group
     const gDrawing = svg
       .append("g")
       .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
-    // Draw reference (percentile bands)
+    // Draw percentile bands
     const decilePaths = gDrawing
       .selectAll("path.deciles")
       .data(decilesNumbers.slice(0, -1));
@@ -308,9 +246,7 @@ function LotteryChart({
       .attr("class", "decile")
       .attr("d", (d, i) => referenceArea(getDecilesRange(i)))
       .attr("fill", (d) => riskRangeColor(d))
-      .attr("opacity", rangeOpacity)
-      .append("title")
-      .text((d) => `Percentile ${d}`);
+      .attr("opacity", rangeOpacity);
 
     // Draw median reference line
     gDrawing
@@ -321,19 +257,16 @@ function LotteryChart({
       .style("fill", "none")
       .style("stroke-width", "3px");
 
-    // Calculate and display median label at the end of the median line
+    // Add median label
     const classMedian = calculateMedian(grades, roster);
     const lastDecileData = decilesByDate[decilesByDate.length - 1];
     if (lastDecileData) {
       const [lastDate, lastDeciles] = lastDecileData;
-      // Format to match header display (no decimal if whole number, otherwise 1 decimal)
       const medianDisplay = Number.isInteger(classMedian) ? classMedian : classMedian.toFixed(1);
 
       gDrawing
         .append("text")
-        .text(
-          `Class median${adjustment > 0 ? " -" + adjustment : ""}: ${medianDisplay}`
-        )
+        .text(`Class median: ${medianDisplay}`)
         .style("text-anchor", "start")
         .style("fill", "#777")
         .style("font-size", "10pt")
@@ -341,7 +274,6 @@ function LotteryChart({
         .attr("y", y(lastDeciles.median) - 3);
     }
 
-    // Draw axes
     // Y axis
     gDrawing
       .append("g")
@@ -384,7 +316,15 @@ function LotteryChart({
     // Data group
     const gData = gDrawing.append("g").attr("class", "data");
 
-    // Draw tick marks for each student per date
+    // Determine which students to show lines for
+    const studentsToShow = new Set([
+      ...selectedStudents,
+      highlightedStudent,
+      hoveredTickStudent,
+      searchedStudentId,
+    ].filter(Boolean));
+
+    // Draw tick marks for each student per date (clickable)
     const nestedArray = Array.from(nestedAccumPoints);
     const dateGroups = gData
       .selectAll(".date")
@@ -406,39 +346,77 @@ function LotteryChart({
       .attr("y2", (d) => y(d.accum) + d.jitter)
       .attr("x1", (d) => x(d.date) - 5)
       .attr("x2", (d) => x(d.date) + 5)
-      .style("stroke", "#999")
-      .style("opacity", 0.6);
+      .style("stroke", (d) => {
+        if (d.ID === highlightedStudent || d.ID === hoveredTickStudent) return "#ffc107";
+        if (selectedStudents.includes(d.ID)) return "#0d6efd";
+        return "#999";
+      })
+      .style("stroke-width", (d) => {
+        if (d.ID === highlightedStudent || d.ID === hoveredTickStudent || selectedStudents.includes(d.ID)) return 2;
+        return 1;
+      })
+      .style("opacity", 0.6)
+      .style("cursor", "pointer")
+      .on("click", function (d) {
+        d3.event.stopPropagation();
+        toggleStudent(d.ID);
+      })
+      .on("mouseenter", function (d) {
+        setHoveredTickStudent(d.ID);
+        setHighlightedStudent(d.ID);
+      })
+      .on("mouseleave", function () {
+        setHoveredTickStudent(null);
+        setHighlightedStudent(null);
+      });
 
-    // Draw student lines if enabled
-    if (showStudentLines) {
+    // Only draw lines for selected/highlighted/searched students
+    if (studentsToShow.size > 0) {
+      const filteredStudentData = Array.from(nestedAccumPointsByID)
+        .filter(([id]) => studentsToShow.has(id));
+
       gData
-        .selectAll(".studentLines")
-        .data(Array.from(nestedAccumPointsByID))
+        .selectAll(".studentLine")
+        .data(filteredStudentData)
         .enter()
         .append("path")
-        .attr("class", "studentLines")
+        .attr("class", "studentLine")
+        .attr("data-id", ([id]) => id)
         .attr("d", ([, values]) => studentLine(values))
         .attr("fill", "none")
-        .attr("stroke", "#777")
-        .attr("opacity", 0.6);
+        .attr("stroke", ([id]) => {
+          if (id === highlightedStudent || id === hoveredTickStudent) return "#ffc107";
+          if (id === searchedStudentId) return "#28a745";
+          if (selectedStudents.includes(id)) return "#0d6efd";
+          return "#777";
+        })
+        .attr("stroke-width", ([id]) => {
+          if (id === highlightedStudent || id === hoveredTickStudent) return 3;
+          if (id === searchedStudentId) return 2.5;
+          if (selectedStudents.includes(id)) return 2;
+          return 1;
+        })
+        .attr("opacity", 0.8)
+        .style("cursor", "pointer")
+        .on("click", function ([id]) {
+          d3.event.stopPropagation();
+          toggleStudent(id);
+        })
+        .on("mouseenter", function ([id]) {
+          setHighlightedStudent(id);
+        })
+        .on("mouseleave", function () {
+          setHighlightedStudent(null);
+        });
     }
 
-    // Draw selected student if code is provided
-    if (resolvedStudentCode) {
-      const selectedGrades = accumPoints.filter((d) => d.ID === resolvedStudentCode);
-      if (selectedGrades.length === 0) {
-        gData
-          .append("text")
-          .attr("x", iwidth / 2)
-          .attr("y", 20)
-          .style("font-size", "16pt")
-          .style("fill", "firebrick")
-          .style("text-anchor", "middle")
-          .text("Code not found");
-      } else {
+    // Draw circles for searched student
+    if (searchedStudentId) {
+      const searchedGrades = accumPoints.filter((d) => d.ID === searchedStudentId);
+      if (searchedGrades.length > 0) {
         const boxes = gData
           .selectAll("g.boxes")
-          .data(selectedGrades)
+          .data(searchedGrades)
           .enter()
           .append("g")
           .attr("class", "boxes")
@@ -446,19 +424,61 @@ function LotteryChart({
 
         boxes
           .append("circle")
-          .attr("r", 10)
+          .attr("r", 8)
           .style("stroke", "white")
           .style("fill", (d) => boxColor(d.points || 0));
 
         boxes
           .append("text")
-          .attr("dx", 12)
-          .attr("dy", 5)
+          .attr("dx", 10)
+          .attr("dy", 4)
           .style("font-size", "8pt")
           .text((d) => `${d.accum}`);
       }
     }
-  }, [grades, roster, rangeOpacity, showStudentLines, studentCode, studentName]);
+
+    // Brush for selection
+    const brushGroup = gDrawing
+      .append("g")
+      .attr("class", "brush")
+      .attr("transform", `translate(${iwidth + 10}, 0)`);
+
+    const brush = d3
+      .brushY()
+      .extent([
+        [0, 0],
+        [30, iheight],
+      ])
+      .on("end", function () {
+        const selection = d3.event.selection;
+        if (!selection) {
+          setSelectionFromBrush([]);
+          return;
+        }
+        const [y0, y1] = selection;
+        const maxAccum = y.invert(y0);
+        const minAccum = y.invert(y1);
+
+        const selected = studentFinalAccum.filter(
+          (s) => s.finalAccum >= minAccum && s.finalAccum <= maxAccum
+        );
+        setSelectionFromBrush(selected.map((s) => s.id));
+      });
+
+    brushGroup.call(brush);
+    brushRef.current = brushGroup;
+
+    // Brush axis label
+    gDrawing
+      .append("text")
+      .attr("x", iwidth + 25)
+      .attr("y", -5)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "9pt")
+      .attr("fill", "#666")
+      .text("Brush");
+
+  }, [grades, roster, accumPoints, dates, rangeOpacity, selectedStudents, highlightedStudent, hoveredTickStudent, searchedStudentId, setSelectionFromBrush, setHighlightedStudent, toggleStudent, studentFinalAccum]);
 
   return (
     <svg
@@ -472,13 +492,12 @@ function LotteryChart({
   );
 }
 
-LotteryChart.propTypes = {
+AdminLotteryChart.propTypes = {
   grades: PropTypes.array.isRequired,
   roster: PropTypes.array,
   rangeOpacity: PropTypes.number,
-  showStudentLines: PropTypes.bool,
-  studentCode: PropTypes.string,
+  onStudentIdMapReady: PropTypes.func,
   studentName: PropTypes.string,
 };
 
-export default LotteryChart;
+export default AdminLotteryChart;
