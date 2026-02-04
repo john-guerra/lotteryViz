@@ -24,7 +24,7 @@ const compactTableStyles = `
 }
 `;
 
-function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymize = false }) {
+function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymize = false, searchFilter = "" }) {
   const { selectedStudents, highlightedStudent, toggleStudent, setHighlightedStudent } = useSelection();
   const [sortColumn, setSortColumn] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
@@ -132,6 +132,13 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
     return sorted;
   }, [studentData, sortColumn, sortDirection]);
 
+  // Filter data based on search term
+  const filteredData = useMemo(() => {
+    if (!searchFilter || !searchFilter.trim()) return sortedData;
+    const term = searchFilter.toLowerCase();
+    return sortedData.filter(s => s.name.toLowerCase().includes(term));
+  }, [sortedData, searchFilter]);
+
   const handleSort = (column) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -187,9 +194,9 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
   };
 
   return (
-    <>
+    <div className="d-flex flex-column" style={{ flex: 1, minHeight: 0 }}>
       <style>{compactTableStyles}</style>
-      <div className="table-responsive" style={{ overflowY: "auto", flex: 1 }}>
+      <div className="table-responsive" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
         <table className="table table-hover table-sm compact-table">
           <thead className="table-light sticky-top">
             <tr>
@@ -222,7 +229,7 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
             </tr>
           </thead>
           <tbody>
-            {sortedData.map((student) => (
+            {filteredData.map((student) => (
               <tr
                 key={student.name}
                 className={getRowClassName(student)}
@@ -256,7 +263,7 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
           </tbody>
         </table>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -266,6 +273,7 @@ StudentTable.propTypes = {
   onShowHistory: PropTypes.func.isRequired,
   studentIdMap: PropTypes.object,
   anonymize: PropTypes.bool,
+  searchFilter: PropTypes.string,
 };
 
 export default StudentTable;
