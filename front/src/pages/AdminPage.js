@@ -70,18 +70,28 @@ function AdminPage() {
         </div>
 
         <div className="row flex-grow-1" style={{ minHeight: 0 }}>
-          <div className="col-md-5 d-flex flex-column" style={{ minHeight: 0, overflow: "hidden" }}>
+          <div className="col-md-5 d-flex flex-column" style={{ minHeight: 0, maxHeight: "100%", overflow: "hidden" }}>
             <div className="d-flex align-items-center justify-content-between mb-2" style={{ flexShrink: 0 }}>
               <h4 className="mb-0">Students</h4>
-              <label className="form-check-label d-flex align-items-center gap-1" style={{ fontSize: "0.875rem" }}>
+              <div className="d-flex align-items-center gap-2">
                 <input
-                  type="checkbox"
-                  className="form-check-input"
-                  checked={anonymize}
-                  onChange={(e) => setAnonymize(e.target.checked)}
+                  type="text"
+                  className="form-control form-control-sm"
+                  style={{ width: "150px" }}
+                  placeholder="Search..."
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
                 />
-                Anonymize
-              </label>
+                <label className="form-check-label d-flex align-items-center gap-1" style={{ fontSize: "0.875rem" }}>
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    checked={anonymize}
+                    onChange={(e) => setAnonymize(e.target.checked)}
+                  />
+                  Anonymize
+                </label>
+              </div>
             </div>
             <StudentTable
               counts={counts}
@@ -89,21 +99,12 @@ function AdminPage() {
               onShowHistory={handleShowHistory}
               studentIdMap={studentIdMap}
               anonymize={anonymize}
+              searchFilter={searchName}
             />
           </div>
           <div className="col-md-7 d-flex flex-column" style={{ minHeight: 0 }}>
             <div className="d-flex align-items-center justify-content-between mb-2" style={{ flexShrink: 0 }}>
               <h4 className="mb-0">Points Over Time</h4>
-              <div className="d-flex align-items-center gap-2">
-                <input
-                  type="text"
-                  className="form-control form-control-sm"
-                  style={{ width: "180px" }}
-                  placeholder="Search by name..."
-                  value={searchName}
-                  onChange={(e) => setSearchName(e.target.value)}
-                />
-              </div>
             </div>
             <AdminLotteryChart
               grades={allGrades}
