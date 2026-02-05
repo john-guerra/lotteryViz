@@ -24,5 +24,10 @@ app.use(express.static(path.join(__dirname, "front/build")));
 
 app.use("/", indexRouter);
 
+// SPA catch-all: serve index.html for any route not handled by API
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "front/build", "index.html"));
+});
+
 // module.exports = app;
 export default app;

@@ -4,10 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prestart": "node db/backup.mjs",
     "start": "node ./node_modules/nodemon/bin/nodemon.js ./bin/www.js",
+    "dev": "node ./node_modules/nodemon/bin/nodemon.js ./bin/www.js",
+    "backup": "node db/backup.mjs",
     "both": "yarn start & (cd front && yarn start)",
+    "both:dev": "yarn dev & (cd front && yarn start)",
     "postinstall": "cd front && npm install && npm run build",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "export_to_canvas": "node export-lottery-to-canvas.mjs"
   },
   "dependencies": {
     "@observablehq/runtime": "5",

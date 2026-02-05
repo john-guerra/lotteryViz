@@ -1,0 +1,14 @@
+{
+  "name": "@john-guerra/lottery-results-from-mongo",
+  "main": "9fee7e0430e3ad86@88.js",
+  "version": "88.0.0",
+  "homepage": "https://observablehq.com/@john-guerra/lottery-results-from-mongo",
+  "author": {
+    "name": "John Alexis Guerra Gómez",
+    "url": "https://observablehq.com/@john-guerra"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "@observablehq/runtime": "4 - 5"
+  }
+}
