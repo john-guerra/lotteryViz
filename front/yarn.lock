@@ -3731,6 +3731,13 @@ d3-chord@1:
     d3-array "1"
     d3-path "1"
 
+d3-cloud@^1.2.8:
+  version "1.2.8"
+  resolved "https://registry.yarnpkg.com/d3-cloud/-/d3-cloud-1.2.8.tgz#a4fbc8af39504cb82eacacdcf7af1dc0c1f7f8a9"
+  integrity sha512-K0qBFkgystNlgFW/ufdwIES5kDiC8cGJxMw4ULzN9UU511v89A6HXs1X8vUPxqurehzqJZS5KzZI4c8McT+4UA==
+  dependencies:
+    d3-dispatch "^1.0.3"
+
 d3-collection@1:
   version "1.0.7"
   resolved "https://registry.npmjs.org/d3-collection/-/d3-collection-1.0.7.tgz"
@@ -3748,7 +3755,7 @@ d3-contour@1:
   dependencies:
     d3-array "^1.1.1"
 
-d3-dispatch@1:
+d3-dispatch@1, d3-dispatch@^1.0.3:
   version "1.0.6"
   resolved "https://registry.npmjs.org/d3-dispatch/-/d3-dispatch-1.0.6.tgz"
   integrity sha512-fVjoElzjhCEy+Hbn8KygnmMS7Or0a9sI2UzGwoB7cCtvI1XpVN9GpoYlnb3xt2YV66oXYb1fLJ8GMvP4hdU1RA==
