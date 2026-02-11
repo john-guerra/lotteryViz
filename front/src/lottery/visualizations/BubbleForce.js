@@ -27,13 +27,16 @@ function splitName(name, radius, fontSize) {
 }
 
 /**
- * Return "white" or "#222" depending on perceived brightness of a hex/rgb color.
+ * Return text fill and stroke colors for readable contrast on a given background.
+ * Uses paint-order: stroke to render a thin halo behind the text.
  */
-function textColorFor(bgColor) {
+function textColorsFor(bgColor) {
   const c = d3.color(bgColor);
-  if (!c) return "#222";
+  if (!c) return { fill: "#222", stroke: "#fff" };
   const lum = (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
-  return lum < 0.55 ? "#fff" : "#222";
+  return lum < 0.45
+    ? { fill: "#fff", stroke: "rgba(0,0,0,0.6)" }
+    : { fill: "#222", stroke: "rgba(255,255,255,0.8)" };
 }
 
 const BubbleForce = ({
@@ -71,9 +74,10 @@ const BubbleForce = ({
       .range([baseMin, baseMax]);
 
     // Color scale: count -> sequential purple
+    // Clamp to [0.15, 1.0] of the interpolator to avoid near-white backgrounds
     const maxCount = Math.max(d3.max(students, (d) => d.count) || 1, 10);
     const colorScale = d3
-      .scaleSequential(d3.interpolatePurples)
+      .scaleSequential((t) => d3.interpolatePurples(0.15 + t * 0.85))
       .domain([0, maxCount]);
 
     // Attach radius to each node
@@ -137,12 +141,15 @@ const BubbleForce = ({
       const totalLines = lines.length + 1;
       const lineHeight = fontSize * 1.2;
       const startY = -(totalLines - 1) * lineHeight / 2;
-      const fill = colorScale(d.count);
+      const colors = textColorsFor(colorScale(d.count));
 
       text
         .attr("text-anchor", "middle")
         .attr("font-size", fontSize + "px")
-        .attr("fill", textColorFor(fill))
+        .attr("fill", colors.fill)
+        .attr("stroke", colors.stroke)
+        .attr("stroke-width", fontSize < 10 ? "2px" : "3px")
+        .attr("paint-order", "stroke")
         .attr("opacity", d.drawn ? 0.3 : 1);
 
       text.selectAll("tspan").remove();
@@ -164,12 +171,15 @@ const BubbleForce = ({
       const lineHeight = fontSize * 1.2;
       const startY = -(totalLines - 1) * lineHeight / 2;
       const countY = startY + nameLines.length * lineHeight;
-      const fill = colorScale(d.count);
+      const colors = textColorsFor(colorScale(d.count));
 
       text
         .attr("text-anchor", "middle")
         .attr("font-size", fontSize + "px")
-        .attr("fill", textColorFor(fill))
+        .attr("fill", colors.fill)
+        .attr("stroke", colors.stroke)
+        .attr("stroke-width", fontSize < 10 ? "2px" : "3px")
+        .attr("paint-order", "stroke")
         .attr("opacity", d.drawn ? 0.3 : 0.7);
 
       text.selectAll("tspan").remove();

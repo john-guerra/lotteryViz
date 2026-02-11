@@ -4,16 +4,6 @@ import * as d3 from "d3";
 import cloud from "d3-cloud";
 import "./WordCloud.css";
 
-/**
- * Return "white" or "#222" depending on perceived brightness of a color.
- */
-function textColorForBg(bgColor) {
-  const c = d3.color(bgColor);
-  if (!c) return "#222";
-  const lum = (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
-  return lum < 0.55 ? "#fff" : "#222";
-}
-
 const WordCloud = ({
   students,
   studentsLeft,
@@ -35,14 +25,13 @@ const WordCloud = ({
     svg.selectAll("*").remove();
 
     // Color scale: count -> sequential purple (same as BubbleForce)
-    // Anchor domain floor at 10 so colors don't remap as counts trickle in
+    // Clamp to [0.15, 1.0] of the interpolator to avoid near-white text on white bg
     const maxCount = Math.max(d3.max(students, (d) => d.count) || 1, 10);
     const colorScale = d3
-      .scaleSequential(d3.interpolatePurples)
+      .scaleSequential((t) => d3.interpolatePurples(0.15 + t * 0.85))
       .domain([0, maxCount]);
 
     // Font size scale: probability -> word size
-    // When adjust is off, all probabilities are equal — use uniform size
     const uniformSize = !adjust;
     const minFont = Math.max(10, Math.min(14, height / 40)) * cloudFontSize;
     const maxFont = Math.max(minFont + 4, Math.min(48, height / 10) * cloudFontSize);
@@ -98,10 +87,7 @@ const WordCloud = ({
           return colorScale(d.count);
         })
         .style("stroke", (d) => {
-          if (d.isSelected) {
-            // Outline for readability on gold text
-            return textColorForBg("gold") === "#fff" ? "#333" : "#fff";
-          }
+          if (d.isSelected) return "#333";
           return "none";
         })
         .style("stroke-width", (d) => (d.isSelected ? "0.5px" : "0"))
