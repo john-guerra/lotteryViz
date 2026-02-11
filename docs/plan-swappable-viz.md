@@ -104,11 +104,19 @@ export { default } from "./lottery/LotteryShell";
 
 `MainPage.js` requires **zero changes** — its `import Lottery from "../Lottery"` still resolves.
 
-## Step 7: (Stretch) Word cloud visualization [TODO]
+## Step 7: (Stretch) Word cloud visualization [DONE]
 
-- Install `d3-cloud` dependency
-- Create `front/src/lottery/visualizations/WordCloud.js`
-- Register in `visualizations/index.js`
+- Installed `d3-cloud` dependency
+- Created `front/src/lottery/visualizations/WordCloud.js` + `WordCloud.css`
+- Registered in `visualizations/index.js` as `cloud: { component: WordCloud, label: "Cloud" }`
+- Word size proportional to probability (uniform when adjust is off)
+- Color by call count (same scale as BubbleForce)
+- Selected student in gold + drop-shadow, drawn students dimmed
+- Legend with color gradient and size explanation
+
+## Bug fix: Stabilize color scale
+
+Both BubbleForce and WordCloud color domains now anchored at `Math.max(maxCount, 10)` so colors don't remap when counts data loads asynchronously or grows during a session.
 
 ---
 
@@ -147,7 +155,8 @@ Every visualization component receives:
 | `front/src/Lottery.js` | Modify (thin re-export) | DONE |
 | `front/src/Lottery.css` | Delete (styles moved) | DONE |
 | `front/src/pages/MainPage.js` | No change | N/A |
-| `front/src/lottery/visualizations/WordCloud.js` | Create | TODO |
+| `front/src/lottery/visualizations/WordCloud.js` | Create | DONE |
+| `front/src/lottery/visualizations/WordCloud.css` | Create | DONE |
 
 ## Algorithm Fairness
 
