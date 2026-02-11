@@ -90,6 +90,12 @@ const LotteryShell = (props) => {
     }));
   }, [engine.studentsLeft, maxNameChars]);
 
+  // Also shorten the selectedStudent name so comparisons match in visualizations
+  const displaySelectedStudent = useMemo(() => {
+    if (!maxNameChars || !props.optionSel) return props.optionSel;
+    return { ...props.optionSel, name: shortenName(props.optionSel.name, maxNameChars) };
+  }, [props.optionSel, maxNameChars]);
+
   const VizComponent = visualizations[vizType].component;
 
   return (
@@ -247,7 +253,7 @@ const LotteryShell = (props) => {
         <VizComponent
           students={displayStudents}
           studentsLeft={displayStudentsLeft}
-          selectedStudent={props.optionSel}
+          selectedStudent={displaySelectedStudent}
           drawnMap={engine.drawnMap}
           allOptions={engine.allOptions}
           dCounts={engine.dCounts}
