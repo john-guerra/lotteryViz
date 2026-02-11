@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
 import useLotteryEngine from "./useLotteryEngine";
 import visualizations from "./visualizations";
@@ -75,10 +75,10 @@ const LotteryShell = (props) => {
 
   // Apply name shortening when maxNameChars is set
   const displayStudents = useMemo(() => {
-    if (!maxNameChars) return engine.students;
     return engine.students.map((s) => ({
       ...s,
-      name: shortenName(s.name, maxNameChars),
+      originalName: s.name,
+      name: maxNameChars ? shortenName(s.name, maxNameChars) : s.name,
     }));
   }, [engine.students, maxNameChars]);
 
@@ -95,6 +95,12 @@ const LotteryShell = (props) => {
     if (!maxNameChars || !props.optionSel) return props.optionSel;
     return { ...props.optionSel, name: shortenName(props.optionSel.name, maxNameChars) };
   }, [props.optionSel, maxNameChars]);
+
+  // Click a bubble to draw that student
+  const handleBubbleClick = useCallback((student) => {
+    if (student.drawn) return;
+    engine.onChooseByName(student.originalName || student.name);
+  }, [engine]);
 
   const VizComponent = visualizations[vizType].component;
 
@@ -265,6 +271,7 @@ const LotteryShell = (props) => {
           cloudFontSize={cloudFontSize}
           width={width}
           height={height}
+          onBubbleClick={handleBubbleClick}
         />
       </div>
     </div>

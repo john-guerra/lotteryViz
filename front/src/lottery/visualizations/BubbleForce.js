@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import * as d3 from "d3";
 import "./BubbleForce.css";
 
-const PADDING = 3;
+const PADDING = 1.5;
 
 /**
  * Split a full name into lines that fit inside a circle of given radius.
@@ -35,8 +35,8 @@ function textColorsFor(bgColor) {
   if (!c) return { fill: "#222", stroke: "#fff" };
   const lum = (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
   return lum < 0.45
-    ? { fill: "#fff", stroke: "rgba(0,0,0,0.6)" }
-    : { fill: "#222", stroke: "rgba(255,255,255,0.8)" };
+    ? { fill: "#fff", stroke: "rgba(255,255,255,0.6)" }
+    : { fill: "#222", stroke: "rgba(255,255,255,0.7)" };
 }
 
 const BubbleForce = ({
@@ -46,10 +46,13 @@ const BubbleForce = ({
   height,
   adjust,
   radiusScale: radiusFactor = 1.0,
+  onBubbleClick,
 }) => {
   const svgRef = useRef();
   const simRef = useRef(null);
   const mergedRef = useRef(null);
+  const clickRef = useRef(onBubbleClick);
+  clickRef.current = onBubbleClick;
 
   // Effect 1: Build/rebuild simulation when data, dimensions, or sizing change
   useEffect(() => {
@@ -60,30 +63,32 @@ const BubbleForce = ({
     const cy = height / 2;
 
     const n = students.length;
-    const area = width * height;
-    const avgRadius = Math.sqrt((area * 0.55) / (n * Math.PI));
-    const baseMin = Math.max(14, avgRadius * 0.5) * radiusFactor;
-    const baseMax = Math.max(baseMin + 4, avgRadius * 1.6 * radiusFactor);
+    const viewArea = width * height;
+    const fillFraction = 0.45;
+    const areaBudget = viewArea * fillFraction;
 
     const uniformSize = !adjust;
-    const uniformR = (baseMin + baseMax) / 2;
+    const maxProb = d3.max(students, (d) => d.probability) || 1;
 
-    const radiusScaleFn = d3
-      .scaleSqrt()
-      .domain([0, d3.max(students, (d) => d.probability) || 1])
-      .range([baseMin, baseMax]);
+    // Compute proportional radii then normalize so total area = areaBudget
+    const relScale = d3.scaleSqrt().domain([0, maxProb]).range([0.5, 1.5]);
+    const rawRadii = students.map((s) =>
+      uniformSize ? 1.0 : relScale(s.probability)
+    );
+    const rawArea = rawRadii.reduce((sum, r) => sum + Math.PI * r * r, 0);
+    const rScale = Math.sqrt(areaBudget / rawArea) * radiusFactor;
+    const MIN_R = 12;
 
     // Color scale: count -> sequential purple
-    // Clamp to [0.15, 1.0] of the interpolator to avoid near-white backgrounds
     const maxCount = Math.max(d3.max(students, (d) => d.count) || 1, 10);
     const colorScale = d3
       .scaleSequential((t) => d3.interpolatePurples(0.15 + t * 0.85))
       .domain([0, maxCount]);
 
     // Attach radius to each node
-    const nodes = students.map((s) => ({
+    const nodes = students.map((s, i) => ({
       ...s,
-      r: uniformSize ? uniformR : radiusScaleFn(s.probability),
+      r: Math.max(MIN_R, rawRadii[i] * rScale),
     }));
 
     if (simRef.current) {
@@ -116,7 +121,11 @@ const BubbleForce = ({
     const enter = bubbles
       .enter()
       .append("g")
-      .attr("class", "bubble");
+      .attr("class", "bubble")
+      .style("cursor", (d) => (d.drawn ? "default" : "pointer"))
+      .on("click", function (d) {
+        if (clickRef.current) clickRef.current(d);
+      });
 
     enter.append("circle");
     enter.append("text").attr("class", "bubble-name");
@@ -148,7 +157,7 @@ const BubbleForce = ({
         .attr("font-size", fontSize + "px")
         .attr("fill", colors.fill)
         .attr("stroke", colors.stroke)
-        .attr("stroke-width", fontSize < 10 ? "2px" : "3px")
+        .attr("stroke-width", fontSize < 10 ? "2px" : "2.5px")
         .attr("paint-order", "stroke")
         .attr("opacity", d.drawn ? 0.3 : 1);
 
@@ -178,7 +187,7 @@ const BubbleForce = ({
         .attr("font-size", fontSize + "px")
         .attr("fill", colors.fill)
         .attr("stroke", colors.stroke)
-        .attr("stroke-width", fontSize < 10 ? "2px" : "3px")
+        .attr("stroke-width", fontSize < 10 ? "2px" : "2.5px")
         .attr("paint-order", "stroke")
         .attr("opacity", d.drawn ? 0.3 : 0.7);
 
@@ -235,6 +244,11 @@ const BubbleForce = ({
     }
 
     sim.on("tick", () => {
+      // Clamp positions so bubbles stay within the viewport
+      nodes.forEach((d) => {
+        d.x = Math.max(d.r, Math.min(width - d.r, d.x));
+        d.y = Math.max(d.r, Math.min(height - d.r, d.y));
+      });
       merged.attr("transform", (d) => `translate(${d.x},${d.y})`);
     });
 
@@ -279,6 +293,7 @@ BubbleForce.propTypes = {
   height: PropTypes.number.isRequired,
   adjust: PropTypes.bool,
   radiusScale: PropTypes.number,
+  onBubbleClick: PropTypes.func,
 };
 
 export default BubbleForce;
