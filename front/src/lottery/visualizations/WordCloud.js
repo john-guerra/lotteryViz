@@ -22,6 +22,9 @@ const WordCloud = ({
   width,
   height,
   adjust,
+  cloudPadding = 4,
+  cloudRotateChance = 0,
+  cloudFontSize = 1.0,
 }) => {
   const svgRef = useRef();
 
@@ -31,18 +34,18 @@ const WordCloud = ({
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    // Color scale: count -> cool-to-warm (same as BubbleForce)
+    // Color scale: count -> sequential purple (same as BubbleForce)
     // Anchor domain floor at 10 so colors don't remap as counts trickle in
     const maxCount = Math.max(d3.max(students, (d) => d.count) || 1, 10);
     const colorScale = d3
-      .scaleSequential(d3.interpolateRdYlBu)
-      .domain([maxCount, 0]);
+      .scaleSequential(d3.interpolatePurples)
+      .domain([0, maxCount]);
 
     // Font size scale: probability -> word size
     // When adjust is off, all probabilities are equal — use uniform size
     const uniformSize = !adjust;
-    const minFont = Math.max(10, Math.min(14, height / 40));
-    const maxFont = Math.max(minFont + 4, Math.min(48, height / 10));
+    const minFont = Math.max(10, Math.min(14, height / 40)) * cloudFontSize;
+    const maxFont = Math.max(minFont + 4, Math.min(48, height / 10) * cloudFontSize);
 
     const fontScale = d3
       .scaleSqrt()
@@ -62,8 +65,8 @@ const WordCloud = ({
     const layout = cloud()
       .size([width, height])
       .words(words)
-      .padding(4)
-      .rotate(() => (Math.random() > 0.65 ? 90 : 0))
+      .padding(cloudPadding)
+      .rotate(() => (Math.random() < cloudRotateChance ? 90 : 0))
       .font("sans-serif")
       .fontSize((d) => d.size)
       .on("end", draw);
@@ -137,7 +140,7 @@ const WordCloud = ({
           .attr("font-size", "8px").attr("fill", "#999");
       }
     }
-  }, [students, selectedStudent, drawnMap, width, height, adjust, studentsLeft]);
+  }, [students, selectedStudent, drawnMap, width, height, adjust, studentsLeft, cloudPadding, cloudRotateChance, cloudFontSize]);
 
   return (
     <svg ref={svgRef} className="WordCloud" width={width} height={height} />
@@ -152,6 +155,9 @@ WordCloud.propTypes = {
   width: PropTypes.number.isRequired,
   height: PropTypes.number.isRequired,
   adjust: PropTypes.bool,
+  cloudPadding: PropTypes.number,
+  cloudRotateChance: PropTypes.number,
+  cloudFontSize: PropTypes.number,
 };
 
 export default WordCloud;

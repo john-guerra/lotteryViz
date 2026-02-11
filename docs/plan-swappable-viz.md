@@ -114,6 +114,15 @@ export { default } from "./lottery/LotteryShell";
 - Selected student in gold + drop-shadow, drawn students dimmed
 - Legend with color gradient and size explanation
 
+## Step 8: Word cloud controls & name shortening [DONE]
+
+- Exposed `cloudPadding` and `cloudRotateChance` as slider controls in LotteryShell (visible only in cloud view)
+- Added `maxNameChars` slider (shared across all visualizations) that collapses long names to initials
+  - e.g. "John Alexis Guerra Gomez" → "John A.G.G." when maxChars=12
+  - `shortenName()` function tries to keep as many full leading words as possible, collapsing the rest to `X.` initials
+  - When set to 0 (default), no shortening is applied
+- WordCloud.js now accepts `cloudPadding` and `cloudRotateChance` props (with defaults matching previous hardcoded values)
+
 ## Bug fix: Stabilize color scale
 
 Both BubbleForce and WordCloud color domains now anchored at `Math.max(maxCount, 10)` so colors don't remap when counts data loads asynchronously or grows during a session.

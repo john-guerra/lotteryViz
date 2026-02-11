@@ -75,12 +75,12 @@ const BubbleForce = ({
       .domain([0, d3.max(students, (d) => d.probability) || 1])
       .range([baseMin, baseMax]);
 
-    // Color scale: count -> cool-to-warm
+    // Color scale: count -> sequential purple
     // Anchor domain floor at 10 so colors don't remap as counts trickle in
     const maxCount = Math.max(d3.max(students, (d) => d.count) || 1, 10);
     const colorScale = d3
-      .scaleSequential(d3.interpolateRdYlBu)
-      .domain([maxCount, 0]);
+      .scaleSequential(d3.interpolatePurples)
+      .domain([0, maxCount]);
 
     // Attach radius to each node
     const nodes = students.map((s) => ({

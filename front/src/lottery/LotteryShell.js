@@ -1,14 +1,49 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import useLotteryEngine from "./useLotteryEngine";
 import visualizations from "./visualizations";
 import "./LotteryShell.css";
+
+/**
+ * Shorten a name to fit within maxChars by collapsing trailing words to initials.
+ * e.g. "John Alexis Guerra Gomez" with maxChars=12 → "John A.G.G."
+ */
+function shortenName(name, maxChars) {
+  if (!maxChars || name.length <= maxChars) return name;
+  const words = name.split(" ");
+  if (words.length <= 1) return name;
+
+  // Try keeping progressively fewer full words, collapsing the rest to initials
+  for (let keep = words.length - 1; keep >= 1; keep--) {
+    const head = words.slice(0, keep).join(" ");
+    const tail = words
+      .slice(keep)
+      .map((w) => w[0].toUpperCase() + ".")
+      .join("");
+    const result = head + " " + tail;
+    if (result.length <= maxChars) return result;
+  }
+
+  // Even one full word + initials doesn't fit — just use first word + initials
+  const head = words[0];
+  const tail = words
+    .slice(1)
+    .map((w) => w[0].toUpperCase() + ".")
+    .join("");
+  return head + " " + tail;
+}
 
 const vizKeys = Object.keys(visualizations);
 
 const LotteryShell = (props) => {
   const [vizType, setVizType] = useState("bubbles");
   const [radiusScale, setRadiusScale] = useState(1.0);
+  // Word cloud parameters
+  const [cloudPadding, setCloudPadding] = useState(4);
+  const [cloudRotateChance, setCloudRotateChance] = useState(0);
+  const [cloudFontSize, setCloudFontSize] = useState(1.0);
+  // Name shortening: 0 means no limit
+  const [maxNameChars, setMaxNameChars] = useState(0);
   const containerRef = useRef();
   const vizContainerRef = useRef();
   const [dims, setDims] = useState({ width: 600, height: 600 });
@@ -37,6 +72,23 @@ const LotteryShell = (props) => {
   }, []);
 
   const { width, height } = dims;
+
+  // Apply name shortening when maxNameChars is set
+  const displayStudents = useMemo(() => {
+    if (!maxNameChars) return engine.students;
+    return engine.students.map((s) => ({
+      ...s,
+      name: shortenName(s.name, maxNameChars),
+    }));
+  }, [engine.students, maxNameChars]);
+
+  const displayStudentsLeft = useMemo(() => {
+    if (!maxNameChars) return engine.studentsLeft;
+    return engine.studentsLeft.map((s) => ({
+      ...s,
+      name: shortenName(s.name, maxNameChars),
+    }));
+  }, [engine.studentsLeft, maxNameChars]);
 
   const VizComponent = visualizations[vizType].component;
 
@@ -131,10 +183,70 @@ const LotteryShell = (props) => {
         </div>
       )}
 
+      {vizType === "cloud" && (
+        <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+          <small className="text-muted">Padding</small>
+          <input
+            type="range"
+            className="form-range form-range-sm"
+            min="0"
+            max="20"
+            step="1"
+            value={cloudPadding}
+            onChange={(e) => setCloudPadding(parseInt(e.target.value, 10))}
+            style={{ maxWidth: 90 }}
+          />
+          <span className="text-muted" style={{ fontSize: "0.75rem" }}>{cloudPadding}</span>
+
+          <small className="text-muted ms-2">Rotation %</small>
+          <input
+            type="range"
+            className="form-range form-range-sm"
+            min="0"
+            max="1"
+            step="0.05"
+            value={cloudRotateChance}
+            onChange={(e) => setCloudRotateChance(parseFloat(e.target.value))}
+            style={{ maxWidth: 90 }}
+          />
+          <span className="text-muted" style={{ fontSize: "0.75rem" }}>{Math.round(cloudRotateChance * 100)}%</span>
+
+          <small className="text-muted ms-2">Font size</small>
+          <input
+            type="range"
+            className="form-range form-range-sm"
+            min="0.3"
+            max="3"
+            step="0.1"
+            value={cloudFontSize}
+            onChange={(e) => setCloudFontSize(parseFloat(e.target.value))}
+            style={{ maxWidth: 90 }}
+          />
+          <span className="text-muted" style={{ fontSize: "0.75rem" }}>{cloudFontSize.toFixed(1)}x</span>
+        </div>
+      )}
+
+      <div className="d-flex align-items-center gap-2 mb-1">
+        <small className="text-muted">Max name length</small>
+        <input
+          type="range"
+          className="form-range form-range-sm"
+          min="0"
+          max="30"
+          step="1"
+          value={maxNameChars}
+          onChange={(e) => setMaxNameChars(parseInt(e.target.value, 10))}
+          style={{ maxWidth: 120 }}
+        />
+        <span className="text-muted" style={{ fontSize: "0.75rem" }}>
+          {maxNameChars === 0 ? "off" : maxNameChars}
+        </span>
+      </div>
+
       <div ref={vizContainerRef}>
         <VizComponent
-          students={engine.students}
-          studentsLeft={engine.studentsLeft}
+          students={displayStudents}
+          studentsLeft={displayStudentsLeft}
           selectedStudent={props.optionSel}
           drawnMap={engine.drawnMap}
           allOptions={engine.allOptions}
@@ -142,6 +254,9 @@ const LotteryShell = (props) => {
           avoidRepetition={engine.avoidRepetition}
           adjust={engine.adjust}
           radiusScale={radiusScale}
+          cloudPadding={cloudPadding}
+          cloudRotateChance={cloudRotateChance}
+          cloudFontSize={cloudFontSize}
           width={width}
           height={height}
         />
