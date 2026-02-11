@@ -110,6 +110,14 @@ export default function useLotteryEngine({ options, counts, optionsDrawn, setOpt
     return chosen;
   }, [optionsLeft, setOptionSel]);
 
+  // Choose a specific student by name
+  const onChooseByName = useCallback((name) => {
+    const match = optionsLeft.find((o) => o.name === name);
+    if (!match) return null;
+    setOptionSel(match);
+    return match;
+  }, [optionsLeft, setOptionSel]);
+
   const onAdjustByHistory = useCallback(
     (evt) => setAdjust(evt.target.checked),
     []
@@ -136,6 +144,7 @@ export default function useLotteryEngine({ options, counts, optionsDrawn, setOpt
     dCounts,
     drawnMap,
     onChoose,
+    onChooseByName,
     onAdjustByHistory,
     onAdjustByVariable,
     onAvoidRepetition,
