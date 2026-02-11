@@ -99,14 +99,12 @@ export default function useLotteryEngine({ options, counts, optionsDrawn, setOpt
   // Choose a random student from the remaining pool
   const onChoose = useCallback(() => {
     if (optionsLeft.length === 0) {
-      console.log("No more options left");
       alert("No more options left");
       return null;
     }
 
     const sel = Math.floor(Math.random() * optionsLeft.length);
     const chosen = optionsLeft[sel];
-    chosen.drawn = true;
 
     setOptionSel(chosen);
     return chosen;

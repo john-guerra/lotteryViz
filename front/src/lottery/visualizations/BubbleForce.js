@@ -32,16 +32,13 @@ function splitName(name, radius, fontSize) {
 function textColorFor(bgColor) {
   const c = d3.color(bgColor);
   if (!c) return "#222";
-  // W3C relative luminance approximation
   const lum = (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
   return lum < 0.55 ? "#fff" : "#222";
 }
 
 const BubbleForce = ({
   students,
-  studentsLeft,
   selectedStudent,
-  drawnMap,
   width,
   height,
   adjust,
@@ -49,7 +46,9 @@ const BubbleForce = ({
 }) => {
   const svgRef = useRef();
   const simRef = useRef(null);
+  const mergedRef = useRef(null);
 
+  // Effect 1: Build/rebuild simulation when data, dimensions, or sizing change
   useEffect(() => {
     if (!students.length) return;
 
@@ -57,26 +56,21 @@ const BubbleForce = ({
     const cx = width / 2;
     const cy = height / 2;
 
-    // Compute radius bounds based on number of students and available area
     const n = students.length;
     const area = width * height;
-    // Target: total bubble area fills ~55% of the SVG area
     const avgRadius = Math.sqrt((area * 0.55) / (n * Math.PI));
     const baseMin = Math.max(14, avgRadius * 0.5) * radiusFactor;
     const baseMax = Math.max(baseMin + 4, avgRadius * 1.6 * radiusFactor);
 
-    // When adjust is off, all students have equal chance — use uniform radius
     const uniformSize = !adjust;
     const uniformR = (baseMin + baseMax) / 2;
 
-    // Radius scale: probability -> circle size
     const radiusScaleFn = d3
       .scaleSqrt()
       .domain([0, d3.max(students, (d) => d.probability) || 1])
       .range([baseMin, baseMax]);
 
     // Color scale: count -> sequential purple
-    // Anchor domain floor at 10 so colors don't remap as counts trickle in
     const maxCount = Math.max(d3.max(students, (d) => d.count) || 1, 10);
     const colorScale = d3
       .scaleSequential(d3.interpolatePurples)
@@ -88,13 +82,10 @@ const BubbleForce = ({
       r: uniformSize ? uniformR : radiusScaleFn(s.probability),
     }));
 
-    // Create or update the simulation
     if (simRef.current) {
       simRef.current.stop();
     }
 
-    // Adjust forces to match aspect ratio — weaken force along the longer axis
-    // so bubbles spread to fill the available space
     const maxDim = Math.max(width, height);
     const xStrength = 0.03 * (height / maxDim);
     const yStrength = 0.03 * (width / maxDim);
@@ -128,24 +119,17 @@ const BubbleForce = ({
     enter.append("text").attr("class", "bubble-count");
 
     const merged = enter.merge(bubbles);
+    mergedRef.current = merged;
 
     merged
       .select("circle")
       .attr("r", (d) => d.r)
       .attr("fill", (d) => colorScale(d.count))
-      .attr("stroke", (d) =>
-        selectedStudent && d.name === selectedStudent.name ? "gold" : "#fff"
-      )
-      .attr("stroke-width", (d) =>
-        selectedStudent && d.name === selectedStudent.name ? 3 : 1.5
-      )
-      .attr("opacity", (d) => (d.drawn ? 0.3 : 1))
-      .classed(
-        "bubble-pulse",
-        (d) => selectedStudent && d.name === selectedStudent.name
-      );
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1.5)
+      .attr("opacity", (d) => (d.drawn ? 0.3 : 1));
 
-    // Name labels: split into multiple lines via <tspan>
+    // Name labels
     merged.select(".bubble-name").each(function (d) {
       const text = d3.select(this);
       const fontSize = Math.max(7, d.r / 3.5);
@@ -171,7 +155,7 @@ const BubbleForce = ({
       });
     });
 
-    // Count label on its own line below the name
+    // Count label
     merged.select(".bubble-count").each(function (d) {
       const text = d3.select(this);
       const fontSize = Math.max(7, d.r / 3.5);
@@ -204,7 +188,6 @@ const BubbleForce = ({
       .attr("class", "legend")
       .attr("transform", `translate(8, ${height - 50})`);
 
-    // Color legend
     const legendW = 80;
     const legendH = 10;
     const defs = svg.selectAll("defs").data([0]).join("defs");
@@ -223,7 +206,6 @@ const BubbleForce = ({
     legend.append("text").text("Color = times called").attr("y", -4)
       .attr("font-size", "8px").attr("fill", "#999");
 
-    // Size legend (only when adjust is on and probabilities vary)
     if (!uniformSize) {
       const sizeLeg = svg.append("g")
         .attr("class", "legend")
@@ -242,20 +224,33 @@ const BubbleForce = ({
         .attr("text-anchor", "middle").attr("font-size", "7px").attr("fill", "#999");
     }
 
-    // Tick handler
     sim.on("tick", () => {
       merged.attr("transform", (d) => `translate(${d.x},${d.y})`);
     });
 
-    // Reheat briefly when selection changes
-    if (selectedStudent) {
-      sim.alpha(0.4).restart();
-    }
-
     return () => {
       sim.stop();
     };
-  }, [students, selectedStudent, drawnMap, width, height, studentsLeft, radiusFactor, adjust]);
+  }, [students, width, height, radiusFactor, adjust]);
+
+  // Effect 2: Update selection styling without rebuilding simulation
+  useEffect(() => {
+    const merged = mergedRef.current;
+    if (!merged) return;
+
+    const selName = selectedStudent?.name;
+
+    merged
+      .select("circle")
+      .attr("stroke", (d) => (d.name === selName ? "gold" : "#fff"))
+      .attr("stroke-width", (d) => (d.name === selName ? 3 : 1.5))
+      .classed("bubble-pulse", (d) => d.name === selName);
+
+    // Reheat briefly for a subtle nudge on selection
+    if (selName && simRef.current) {
+      simRef.current.alpha(0.15).restart();
+    }
+  }, [selectedStudent]);
 
   return (
     <svg
@@ -269,9 +264,7 @@ const BubbleForce = ({
 
 BubbleForce.propTypes = {
   students: PropTypes.array.isRequired,
-  studentsLeft: PropTypes.array.isRequired,
   selectedStudent: PropTypes.object,
-  drawnMap: PropTypes.object.isRequired,
   width: PropTypes.number.isRequired,
   height: PropTypes.number.isRequired,
   adjust: PropTypes.bool,
