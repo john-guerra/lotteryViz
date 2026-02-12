@@ -130,6 +130,7 @@ const BubbleForce = ({
     enter.append("circle");
     enter.append("text").attr("class", "bubble-name");
     enter.append("text").attr("class", "bubble-count");
+    enter.append("text").attr("class", "bubble-prob");
 
     const merged = enter.merge(bubbles);
     mergedRef.current = merged;
@@ -147,7 +148,7 @@ const BubbleForce = ({
       const text = d3.select(this);
       const fontSize = Math.max(7, d.r / 3.5);
       const lines = splitName(d.name, d.r, fontSize);
-      const totalLines = lines.length + 1;
+      const totalLines = lines.length + 2;
       const lineHeight = fontSize * 1.2;
       const startY = -(totalLines - 1) * lineHeight / 2;
       const colors = textColorsFor(colorScale(d.count));
@@ -176,7 +177,7 @@ const BubbleForce = ({
       const text = d3.select(this);
       const fontSize = Math.max(7, d.r / 3.5);
       const nameLines = splitName(d.name, d.r, fontSize);
-      const totalLines = nameLines.length + 1;
+      const totalLines = nameLines.length + 2;
       const lineHeight = fontSize * 1.2;
       const startY = -(totalLines - 1) * lineHeight / 2;
       const countY = startY + nameLines.length * lineHeight;
@@ -197,6 +198,35 @@ const BubbleForce = ({
         .attr("x", 0)
         .attr("dy", countY + "px")
         .text(d.count);
+    });
+
+    // Probability label
+    merged.select(".bubble-prob").each(function (d) {
+      const text = d3.select(this);
+      const fontSize = Math.max(7, d.r / 3.5);
+      const nameLines = splitName(d.name, d.r, fontSize);
+      const totalLines = nameLines.length + 2;
+      const lineHeight = fontSize * 1.2;
+      const startY = -(totalLines - 1) * lineHeight / 2;
+      const probY = startY + (nameLines.length + 1) * lineHeight;
+      const colors = textColorsFor(colorScale(d.count));
+      const pct = (d.probability * 100).toFixed(1) + "%";
+
+      text
+        .attr("text-anchor", "middle")
+        .attr("font-size", (fontSize * 0.85) + "px")
+        .attr("fill", colors.fill)
+        .attr("stroke", colors.stroke)
+        .attr("stroke-width", fontSize < 10 ? "2px" : "2.5px")
+        .attr("paint-order", "stroke")
+        .attr("opacity", d.drawn ? 0.3 : 0.5);
+
+      text.selectAll("tspan").remove();
+      text
+        .append("tspan")
+        .attr("x", 0)
+        .attr("dy", probY + "px")
+        .text(pct);
     });
 
     bubbles.exit().remove();
