@@ -243,6 +243,17 @@ const BubbleForce = ({
         .attr("text-anchor", "middle").attr("font-size", "7px").attr("fill", "#999");
     }
 
+    // "Already called" legend
+    const drawnLeg = svg.append("g")
+      .attr("class", "legend")
+      .attr("transform", `translate(${width - 130}, ${height - 50})`);
+    const drawnR = 7;
+    drawnLeg.append("circle").attr("cx", drawnR).attr("cy", 0).attr("r", drawnR)
+      .attr("fill", colorScale(5)).attr("opacity", 0.3).attr("stroke", "#fff").attr("stroke-width", 1);
+    drawnLeg.append("text").text("= already called today")
+      .attr("x", drawnR * 2 + 4).attr("y", 3)
+      .attr("font-size", "8px").attr("fill", "#999");
+
     sim.on("tick", () => {
       // Clamp positions so bubbles stay within the viewport
       nodes.forEach((d) => {

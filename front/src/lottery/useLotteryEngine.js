@@ -25,6 +25,7 @@ export default function useLotteryEngine({ options, counts, optionsDrawn, setOpt
         map.set(d._id, d);
       }
     }
+    console.log("counts", counts, "dCounts", map);
     return map;
   }, [options, counts]);
 
@@ -71,7 +72,7 @@ export default function useLotteryEngine({ options, counts, optionsDrawn, setOpt
 
     // Deduplicate: one entry per unique student name
     const seen = new Set();
-    return allOptions
+    const result = allOptions
       .filter((o) => {
         if (seen.has(o.name)) return false;
         seen.add(o.name);
@@ -89,7 +90,29 @@ export default function useLotteryEngine({ options, counts, optionsDrawn, setOpt
           probability: (nameWeights[o.name] || 0) / totalWeight,
         };
       });
-  }, [allOptions, optionsLeft, dCounts, drawnMap]);
+
+    // --- Debug: selection-probability table ---
+    const maxCount = Math.max(...result.map(s => s.count), 0);
+    const maxSum = Math.max(...result.map(s => s.sum), 0);
+    const weightByCount = (s) => (maxCount - s.count) * ADJUSTMENT_FACTOR + 1;
+    const weightBySum = (s) => (maxSum - s.sum) * ADJUSTMENT_FACTOR + 1;
+    const totalByCount = result.reduce((t, s) => t + weightByCount(s), 0) || 1;
+    const totalBySum = result.reduce((t, s) => t + weightBySum(s), 0) || 1;
+    const debugRows = result.map(s => ({
+      name: s.name,
+      count: s.count,
+      sum: s.sum,
+      adjustedCount: s.adjustedCount,
+      probability: +(s.probability * 100).toFixed(2) + '%',
+      pctByCount: +((weightByCount(s) / totalByCount) * 100).toFixed(2) + '%',
+      pctBySum: +((weightBySum(s) / totalBySum) * 100).toFixed(2) + '%',
+    }));
+    debugRows.sort((a, b) => b.adjustedCount - a.adjustedCount);
+    console.log(`[Lottery Debug] adjustBy="${adjustByVariable}", poolSize=${totalWeight}`);
+    console.table(debugRows);
+
+    return result;
+  }, [allOptions, optionsLeft, dCounts, drawnMap, adjustByVariable]);
 
   const studentsLeft = useMemo(
     () => students.filter((s) => !s.drawn),
