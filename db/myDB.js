@@ -59,7 +59,7 @@ function setGrade(grade, cbk) {
     const date = grade.timestamp.toDateString();
 
     // If grade.timestamp exists we are updating
-    grades.update(
+    grades.updateOne(
       {
         name: grade.name,
         date: date,
@@ -67,11 +67,13 @@ function setGrade(grade, cbk) {
         course: grade.course,
       },
       {
-        date: date,
-        timestamp: grade.timestamp || grade.timestamp,
-        name: grade.name,
-        grade: grade.grade,
-        course: grade.course,
+        $set: {
+          date: date,
+          timestamp: grade.timestamp,
+          name: grade.name,
+          grade: grade.grade,
+          course: grade.course,
+        },
       },
       { upsert: true },
       function (res) {
