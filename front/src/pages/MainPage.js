@@ -184,7 +184,7 @@ const MainPage = () => {
       <h1>
         Class participation
         <br />
-        <small>Current class median: {getMedian()} points</small>
+        <small>Current class median: {getMedian()} points{(classes[course].medianAdjustment ?? 0) > 0 && ` (adjusted -${classes[course].medianAdjustment})`}</small>
       </h1>
       {renderCourseSelector()}
       <div className="row">

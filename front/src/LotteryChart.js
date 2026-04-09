@@ -332,7 +332,7 @@ function LotteryChart({
 
       gDrawing
         .append("text")
-        .text(`Class median: ${medianDisplay}`)
+        .text(`Class median: ${medianDisplay}${adjustment > 0 ? ` (adj. -${adjustment})` : ""}`)
         .style("text-anchor", "start")
         .style("fill", "#777")
         .style("font-size", "10pt")
