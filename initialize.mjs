@@ -20,7 +20,7 @@ client.connect(async function(err) {
   for (let cl in classes) {
     console.log("initializing", cl);
     const grades = client.db(`lottery_${cl}`).collection("grades");
-    for (let name of classes[cl]) {
+    for (let name of classes[cl].roster) {
       if ((await grades.find({ name }).count()) === 0) {
         console.log(`Name not found ${name} initializing`);
 

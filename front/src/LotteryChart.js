@@ -175,6 +175,7 @@ const HEIGHT = 450;
 function LotteryChart({
   grades,
   roster = null,
+  medianAdjustment = 0,
   rangeOpacity = 0.6,
   showStudentLines = false,
   studentCode = "",
@@ -213,7 +214,7 @@ function LotteryChart({
     if (!accumPoints.length || !dates.length) return;
 
     const n = 50;
-    const adjustment = 0;
+    const adjustment = medianAdjustment;
     const decilesByDate = buildDecilesByDate(accumPoints, dates, n, adjustment);
     const decilesNumbers = d3.range(0, 100 + 100 / n, 100 / n);
 

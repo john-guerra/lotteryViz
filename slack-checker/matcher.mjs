@@ -6,7 +6,7 @@ import { classes } from "../front/src/students.mjs";
  * @returns {string[]} - Array of student names
  */
 export function loadStudentRoster(course) {
-  const roster = classes[course];
+  const roster = classes[course]?.roster;
   if (!roster) {
     const availableCourses = Object.keys(classes).join(", ");
     throw new Error(

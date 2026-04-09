@@ -559,6 +559,9 @@ async function processCourse(courseName, options = {}) {
     (a, b) => a - b
   );
 
+  // Get the per-class median adjustment from students.mjs config
+  const medianAdjustment = classes[courseName]?.medianAdjustment ?? 0;
+
   // Calculate stats first (before computing grades)
   const mean =
     allPointsSorted.reduce((a, b) => a + b, 0) / allPointsSorted.length || 0;
@@ -566,7 +569,9 @@ async function processCourse(courseName, options = {}) {
     allPointsSorted.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) /
     allPointsSorted.length;
   const stats = {
-    median: allPointsSorted[Math.floor(allPointsSorted.length / 2)],
+    // Subtract medianAdjustment so the grading threshold matches the
+    // adjusted median displayed on the participation chart.
+    median: allPointsSorted[Math.floor(allPointsSorted.length / 2)] - medianAdjustment,
     stdDev: Math.sqrt(variance),
   };
 
@@ -626,7 +631,11 @@ async function processCourse(courseName, options = {}) {
 
   console.log("\n--- Statistics ---");
   console.log(`  Total students: ${stats.total}`);
-  console.log(`  Points - Min: ${stats.min}, Max: ${stats.max}, Median: ${stats.median}, Mean: ${stats.mean.toFixed(1)}`);
+  const rawMedian = allPointsSorted[Math.floor(allPointsSorted.length / 2)];
+  const medianDisplay = medianAdjustment > 0
+    ? `${stats.median} (raw: ${rawMedian}, adjustment: -${medianAdjustment})`
+    : `${stats.median}`;
+  console.log(`  Points - Min: ${stats.min}, Max: ${stats.max}, Median: ${medianDisplay}, Mean: ${stats.mean.toFixed(1)}`);
   console.log(`  Calls - Median: ${stats.medianCalls}`);
 
   // Step 7: Submit grades to Canvas (if not dry run)
@@ -708,9 +717,10 @@ async function processCourse(courseName, options = {}) {
       const studentKey = student.lotteryName?.toUpperCase();
       const studentEntries = studentKey ? entriesByStudent.get(studentKey) || [] : [];
 
+      const adjustmentNote = medianAdjustment > 0 ? ` [adjusted -${medianAdjustment}]` : "";
       const comment = `🤖Lottery bot | Grade: ${student.grade}
 
-📊 ${student.calls} calls, ${student.points} pts total | ${student.percentile.toFixed(1)}th %ile (median: ${stats.median} pts, ${stats.medianCalls} calls)
+📊 ${student.calls} calls, ${student.points} pts total | ${student.percentile.toFixed(1)}th %ile (median: ${stats.median} pts${adjustmentNote}, ${stats.medianCalls} calls)
 📐 Formula: median=100, above=linear to 110, below=quadratic SD curve
 
 📋 Point History:

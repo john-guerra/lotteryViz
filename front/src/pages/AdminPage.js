@@ -108,7 +108,8 @@ function AdminPage() {
             </div>
             <AdminLotteryChart
               grades={allGrades}
-              roster={classes[course]}
+              roster={classes[course].roster}
+              medianAdjustment={classes[course].medianAdjustment ?? 0}
               onStudentIdMapReady={handleStudentIdMapReady}
               studentName={searchName}
             />

@@ -247,7 +247,7 @@ async function generateMapping() {
   for (const backupFile of backupFiles) {
     const filename = path.basename(backupFile, ".json");
     const rosterKey = getCourseRosterKey(filename);
-    const roster = classes[rosterKey];
+    const roster = classes[rosterKey]?.roster;
 
     if (!roster) {
       console.log(`Skipping ${filename}: no roster found for "${rosterKey}"`);

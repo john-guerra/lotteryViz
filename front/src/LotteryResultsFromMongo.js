@@ -5,6 +5,7 @@ import LotteryChart from "./LotteryChart";
 function LotteryResultsFromMongo({
   grades,
   roster = null,
+  medianAdjustment = 0,
   rangeOpacity = 0.6,
   showStudentLines = false,
   studentCode = "",
@@ -15,6 +16,7 @@ function LotteryResultsFromMongo({
       <LotteryChart
         grades={grades || []}
         roster={roster}
+        medianAdjustment={medianAdjustment}
         rangeOpacity={rangeOpacity}
         showStudentLines={showStudentLines}
         studentCode={studentCode}
@@ -27,6 +29,7 @@ function LotteryResultsFromMongo({
 LotteryResultsFromMongo.propTypes = {
   grades: PropTypes.array,
   roster: PropTypes.array,
+  medianAdjustment: PropTypes.number,
   rangeOpacity: PropTypes.number,
   showStudentLines: PropTypes.bool,
   studentCode: PropTypes.string,
