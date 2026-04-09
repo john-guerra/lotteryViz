@@ -323,18 +323,16 @@ function LotteryChart({
       .style("stroke-width", "3px");
 
     // Calculate and display median label at the end of the median line
-    const classMedian = calculateMedian(grades, roster);
     const lastDecileData = decilesByDate[decilesByDate.length - 1];
     if (lastDecileData) {
       const [lastDate, lastDeciles] = lastDecileData;
-      // Format to match header display (no decimal if whole number, otherwise 1 decimal)
+      // lastDeciles.median is already adjustment-subtracted by buildDecilesByDate
+      const classMedian = lastDeciles.median;
       const medianDisplay = Number.isInteger(classMedian) ? classMedian : classMedian.toFixed(1);
 
       gDrawing
         .append("text")
-        .text(
-          `Class median${adjustment > 0 ? " -" + adjustment : ""}: ${medianDisplay}`
-        )
+        .text(`Class median: ${medianDisplay}`)
         .style("text-anchor", "start")
         .style("fill", "#777")
         .style("font-size", "10pt")
@@ -459,7 +457,7 @@ function LotteryChart({
           .text((d) => `${d.accum}`);
       }
     }
-  }, [grades, roster, rangeOpacity, showStudentLines, studentCode, studentName]);
+  }, [grades, roster, medianAdjustment, rangeOpacity, showStudentLines, studentCode, studentName]);
 
   return (
     <svg

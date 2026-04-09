@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useMemo, useState } from "react";
 import * as d3 from "d3";
 import PropTypes from "prop-types";
 import { useSelection } from "../context/SelectionContext";
-import { calculateMedian } from "../LotteryChart";
 
 
 function groupBy(array, keyFn) {
@@ -186,7 +185,7 @@ function AdminLotteryChart({ grades, roster = null, medianAdjustment = 0, rangeO
     const x = d3.scalePoint().domain(dates).range([0, iwidth]);
     const y = d3
       .scaleLinear()
-      .domain([0, d3.max(accumPoints, (d) => d.accum)])
+      .domain([-adjustment, d3.max(accumPoints, (d) => d.accum)])
       .nice()
       .range([iheight, 0]);
 
@@ -258,10 +257,11 @@ function AdminLotteryChart({ grades, roster = null, medianAdjustment = 0, rangeO
       .style("stroke-width", "3px");
 
     // Add median label
-    const classMedian = calculateMedian(grades, roster);
     const lastDecileData = decilesByDate[decilesByDate.length - 1];
     if (lastDecileData) {
       const [lastDate, lastDeciles] = lastDecileData;
+      // lastDeciles.median is already adjustment-subtracted by buildDecilesByDate
+      const classMedian = lastDeciles.median;
       const medianDisplay = Number.isInteger(classMedian) ? classMedian : classMedian.toFixed(1);
 
       gDrawing

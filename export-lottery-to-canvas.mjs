@@ -562,27 +562,34 @@ async function processCourse(courseName, options = {}) {
   // Get the per-class median adjustment from students.mjs config
   const medianAdjustment = classes[courseName]?.medianAdjustment ?? 0;
 
-  // Calculate stats first (before computing grades)
+  // Shift all points by the adjustment before grading so the percentile
+  // formula stays coherent. If only stats.median is shifted, students
+  // between the adjusted and raw medians get grades < 100 despite being
+  // above the effective threshold. Shifting all points preserves relative
+  // ranking while moving the "grade 100" reference point correctly.
+  const adjustedPointsSorted = allPointsSorted.map((p) => p - medianAdjustment);
+
   const mean =
-    allPointsSorted.reduce((a, b) => a + b, 0) / allPointsSorted.length || 0;
+    adjustedPointsSorted.reduce((a, b) => a + b, 0) / adjustedPointsSorted.length || 0;
   const variance =
-    allPointsSorted.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) /
-    allPointsSorted.length;
+    adjustedPointsSorted.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) /
+    adjustedPointsSorted.length;
   const stats = {
-    // Subtract medianAdjustment so the grading threshold matches the
-    // adjusted median displayed on the participation chart.
-    median: allPointsSorted[Math.floor(allPointsSorted.length / 2)] - medianAdjustment,
+    median: adjustedPointsSorted[Math.floor(adjustedPointsSorted.length / 2)],
     stdDev: Math.sqrt(variance),
   };
 
-  const studentsWithGrades = allStudents.map((student) => ({
-    ...student,
-    grade: computeGrade(student.points, allPointsSorted, stats),
-    percentile:
-      (allPointsSorted.filter((p) => p < student.points).length /
-        Math.max(1, allPointsSorted.length - 1)) *
-      100,
-  }));
+  const studentsWithGrades = allStudents.map((student) => {
+    const adjustedPoints = student.points - medianAdjustment;
+    return {
+      ...student,
+      grade: computeGrade(adjustedPoints, adjustedPointsSorted, stats),
+      percentile:
+        (adjustedPointsSorted.filter((p) => p < adjustedPoints).length /
+          Math.max(1, adjustedPointsSorted.length - 1)) *
+        100,
+    };
+  });
 
   // Sort by points descending for display
   studentsWithGrades.sort((a, b) => b.points - a.points);
