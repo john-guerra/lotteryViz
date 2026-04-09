@@ -579,17 +579,16 @@ async function processCourse(courseName, options = {}) {
     stdDev: Math.sqrt(variance),
   };
 
-  const studentsWithGrades = allStudents.map((student) => {
-    const adjustedPoints = student.points - medianAdjustment;
-    return {
-      ...student,
-      grade: computeGrade(adjustedPoints, adjustedPointsSorted, stats),
-      percentile:
-        (adjustedPointsSorted.filter((p) => p < adjustedPoints).length /
-          Math.max(1, adjustedPointsSorted.length - 1)) *
-        100,
-    };
-  });
+  const studentsWithGrades = allStudents.map((student) => ({
+    ...student,
+    // Use raw student points against the shifted distribution so that
+    // a student at the adjusted median lands at the 50th percentile.
+    grade: computeGrade(student.points, adjustedPointsSorted, stats),
+    percentile:
+      (adjustedPointsSorted.filter((p) => p < student.points).length /
+        Math.max(1, adjustedPointsSorted.length - 1)) *
+      100,
+  }));
 
   // Sort by points descending for display
   studentsWithGrades.sort((a, b) => b.points - a.points);
