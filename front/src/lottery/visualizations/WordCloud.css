@@ -1,0 +1,12 @@
+.WordCloud {
+  display: block;
+}
+
+.WordCloud .cloud-word {
+  cursor: default;
+  transition: opacity 0.3s;
+}
+
+.WordCloud .cloud-selected {
+  filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.8));
+}

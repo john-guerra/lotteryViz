@@ -1,64 +1,39 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
-import { Runtime, Inspector } from "@observablehq/runtime";
-import notebookUrl from "@john-guerra/lottery-results-from-mongo";
+import React from "react";
 import PropTypes from "prop-types";
+import LotteryChart from "./LotteryChart";
 
 function LotteryResultsFromMongo({
-  courseName = "webdev_fall_2025",
-  optionsDrawn,
+  grades,
+  roster = null,
+  medianAdjustment = 0,
+  rangeOpacity = 0.6,
+  showStudentLines = false,
+  studentCode = "",
+  studentName = "",
 }) {
-  const viewofCourseNameRef = useRef();
-  const lotteryChartRef = useRef();
-
-  const [width, setWidth] = useState(600);
-
-  useCallback((node) => {
-    if (node !== null) {
-      console.log(
-        "Lottery viz width",
-        node ? node.getBoundingClientRect().width - 100 : 400
-      );
-      setWidth(node ? node.getBoundingClientRect().width - 100 : 400);
-    }
-  }, []);
-
-  useEffect(() => {
-    console.log("update lottery viz");
-
-    const runtime = new Runtime();
-    const notebook = runtime.module(notebookUrl, (name) => {
-      if (name === "viewof courseName")
-        return new Inspector(viewofCourseNameRef.current);
-      if (name === "lotteryChart")
-        return new Inspector(lotteryChartRef.current);
-      return [
-        "lotteryMongo",
-        "viewof lotteryDF",
-        "lottery",
-        "width",
-        "defaultCourse",
-      ].includes(name);
-    });
-
-    notebook.redefine("width", width);
-    notebook.redefine("defaultCourse", courseName);
-
-    console.log("courseName", viewofCourseNameRef.current);
-
-    return () => runtime.dispose();
-  }, [width, courseName, optionsDrawn]);
-
   return (
-    <>
-      <div ref={viewofCourseNameRef} />
-      <div ref={lotteryChartRef} />
-    </>
+    <div className="w-100">
+      <LotteryChart
+        grades={grades || []}
+        roster={roster}
+        medianAdjustment={medianAdjustment}
+        rangeOpacity={rangeOpacity}
+        showStudentLines={showStudentLines}
+        studentCode={studentCode}
+        studentName={studentName}
+      />
+    </div>
   );
 }
 
 LotteryResultsFromMongo.propTypes = {
-  courseName: PropTypes.string.isRequired,
-  optionsDrawn: PropTypes.array.isRequired,
+  grades: PropTypes.array,
+  roster: PropTypes.array,
+  medianAdjustment: PropTypes.number,
+  rangeOpacity: PropTypes.number,
+  showStudentLines: PropTypes.bool,
+  studentCode: PropTypes.string,
+  studentName: PropTypes.string,
 };
 
 export default LotteryResultsFromMongo;

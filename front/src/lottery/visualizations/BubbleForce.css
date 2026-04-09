@@ -1,0 +1,30 @@
+.BubbleForce {
+  display: block;
+}
+
+.BubbleForce .bubble-name {
+  fill: #222;
+  font-family: sans-serif;
+  pointer-events: none;
+}
+
+.BubbleForce .bubble-count {
+  fill: #555;
+  font-family: sans-serif;
+  pointer-events: none;
+}
+
+.BubbleForce circle {
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+@keyframes pulse {
+  0%   { stroke-width: 3; }
+  50%  { stroke-width: 6; }
+  100% { stroke-width: 3; }
+}
+
+.BubbleForce .bubble-pulse {
+  animation: pulse 0.8s ease-in-out 3;
+}
