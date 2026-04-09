@@ -171,7 +171,7 @@ const MainPage = () => {
   };
 
   function getMedian() {
-    return calculateMedian(allGrades, classes[course].roster);
+    return calculateMedian(allGrades, classes[course].roster) - (classes[course].medianAdjustment ?? 0);
   }
 
   const onChangeDate = (evt) => {
