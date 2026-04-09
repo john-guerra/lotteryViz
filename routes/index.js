@@ -88,7 +88,7 @@ router.get("/getAllGrades/:course", cors(corsOptions), function (req, res) {
         (g) =>
           !FILTER_BY_REGISTERED ||
           (classes[req.params.course] &&
-            classes[req.params.course].includes(g.name))
+            classes[req.params.course].roster.includes(g.name))
       )
     );
   });
@@ -102,7 +102,7 @@ router.get("/getCounts/:course", cors(corsOptions), function (req, res) {
     res.json(
       counts.filter(
         (g) =>
-          !FILTER_BY_REGISTERED || classes[req.params.course].includes(g._id)
+          !FILTER_BY_REGISTERED || classes[req.params.course].roster.includes(g._id)
       )
     );
   });

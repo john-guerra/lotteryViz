@@ -119,7 +119,7 @@ function buildDecilesByDate(accumPoints, dates, n = 50, adjustment = 0) {
 const WIDTH = 800;
 const HEIGHT = 450;
 
-function AdminLotteryChart({ grades, roster = null, rangeOpacity = 0.6, onStudentIdMapReady, studentName = "" }) {
+function AdminLotteryChart({ grades, roster = null, medianAdjustment = 0, rangeOpacity = 0.6, onStudentIdMapReady, studentName = "" }) {
   const svgRef = useRef();
   const brushRef = useRef();
   const { selectedStudents, highlightedStudent, setSelectionFromBrush, setHighlightedStudent, toggleStudent } = useSelection();
@@ -176,7 +176,7 @@ function AdminLotteryChart({ grades, roster = null, rangeOpacity = 0.6, onStuden
     const iheight = HEIGHT - margin.top - margin.bottom;
 
     const n = 50;
-    const adjustment = 0;
+    const adjustment = medianAdjustment;
     const decilesByDate = buildDecilesByDate(accumPoints, dates, n, adjustment);
     const decilesNumbers = d3.range(0, 100 + 100 / n, 100 / n);
 

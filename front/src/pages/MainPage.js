@@ -15,7 +15,7 @@ function toLocaleIsoString(date) {
 
 const MainPage = () => {
   const [course, setCourse] = useState(Object.keys(classes)[0]);
-  const [options, setOptions] = useState(classes[course]);
+  const [options, setOptions] = useState(classes[course].roster);
   const [dayGrades, setDayGrades] = useState([]);
   const [useCustomDate, setUseCustomDate] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -150,7 +150,7 @@ const MainPage = () => {
   const onChangeCourse = (evt) => {
     console.log("course", evt.target.value);
     setCourse(evt.target.value);
-    setOptions(classes[evt.target.value]);
+    setOptions(classes[evt.target.value].roster);
   };
 
   const renderCourseSelector = () => {
@@ -171,7 +171,7 @@ const MainPage = () => {
   };
 
   function getMedian() {
-    return calculateMedian(allGrades, classes[course]);
+    return calculateMedian(allGrades, classes[course].roster);
   }
 
   const onChangeDate = (evt) => {
@@ -280,7 +280,8 @@ const MainPage = () => {
             <div id="lotteryResultsFromMongo">
               <LotteryResultsFromMongo
                 grades={allGrades}
-                roster={classes[course]}
+                roster={classes[course].roster}
+                medianAdjustment={classes[course].medianAdjustment ?? 0}
                 rangeOpacity={chartOpacity}
                 showStudentLines={showStudentLines}
                 studentName={studentName}
