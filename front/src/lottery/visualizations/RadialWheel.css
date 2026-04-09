@@ -1,0 +1,15 @@
+.RadialWheel .option {
+  font-size: 8pt;
+  fill: steelblue;
+  font-family: sans-serif;
+}
+
+.RadialWheel .option.drawn {
+  fill: grey;
+}
+
+.RadialWheel .option.selected,
+.RadialWheel .option.selected.drawn {
+  fill: red;
+  font-size: 200%;
+}

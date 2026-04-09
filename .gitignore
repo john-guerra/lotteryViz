@@ -64,3 +64,37 @@ typings/
 
 # Student data (privacy)
 front/src/students.mjs
+front/src/students.mjs.bk
+
+# Database backups
+db/backups/
+
+# Canvas export logs
+canvas-export-log.txt
+
+# Grade dumps (PII)
+grades_*.json
+grades_*.dump
+
+# Student name mapping (PII)
+db/name-mapping.json
+
+# Canvas config
+canvas-config.json
+
+# Environment files
+front/.env.local
+
+# Build artifacts
+front/build/
+
+# Editor / tooling
+.playwright-mcp/
+.vscode/
+
+# Lockfiles (repo uses yarn)
+package-lock.json
+front/package-lock.json
+
+# Backup files
+*.old

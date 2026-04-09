@@ -11,8 +11,7 @@ button {
   float: left;
 }
 #drawnBox {
-  width: 40%;
-  float: left;
+  width: 100%;
 }
 #btnChoose {
   font-size: 150%;
