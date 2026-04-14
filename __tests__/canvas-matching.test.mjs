@@ -1,4 +1,5 @@
 import {
+  MIN_CONFIDENCE,
   parseNameParts,
   scoreNameMatch,
   matchLotteryToCanvas,
@@ -49,12 +50,12 @@ describe("scoreNameMatch", () => {
     expect(scoreNameMatch(a, b)).toBe(90);
   });
 
-  test("same first name but different last name scores below 70 (MIN_CONFIDENCE)", () => {
+  test("same first name but different last name scores below MIN_CONFIDENCE", () => {
     // This is the bug case: "Daniel Luo" should NOT match "Daniel Kim"
     const a = parseNameParts("Daniel Luo");
     const b = parseNameParts("Daniel Kim");
     const score = scoreNameMatch(a, b);
-    expect(score).toBeLessThan(70);
+    expect(score).toBeLessThan(MIN_CONFIDENCE);
   });
 
   test("completely different names score very low", () => {
@@ -68,7 +69,7 @@ describe("scoreNameMatch", () => {
     const a = parseNameParts("Jon Smith");
     const b = parseNameParts("John Smith");
     const score = scoreNameMatch(a, b);
-    expect(score).toBeGreaterThanOrEqual(70);
+    expect(score).toBeGreaterThanOrEqual(MIN_CONFIDENCE);
   });
 });
 
@@ -112,7 +113,7 @@ describe("matchLotteryToCanvas", () => {
     // Force a conflict by using names that both match above threshold
     // "James Smith" and "Jamie Smith" both match "James Smith" in Canvas
     const lottery = [
-      lotteryEntry("James Smith", 10, 20),   // exact match → 100
+      lotteryEntry("James Smith", 10, 20),   // exact match -> 100
       lotteryEntry("Jamie Smith", 5, 8),      // partial match
     ];
     const canvas = [canvasStudent("James Smith", 201)];
@@ -129,10 +130,9 @@ describe("matchLotteryToCanvas", () => {
   });
 
   test("displaced entries have displaced flag set to true", () => {
-    // Use names where both clearly match the same Canvas student above threshold
-    // "Alexander Blakeney" and "Alex Blakeney" both match "Alexander Blakeney"
+    // "Alexander Blakeney" and "Alex Blakeney" both match above threshold
     const lottery = [
-      lotteryEntry("Alexander Blakeney", 15, 30),  // exact → 100
+      lotteryEntry("Alexander Blakeney", 15, 30),  // exact -> 100
       lotteryEntry("Alex Blakeney", 5, 10),         // partial but last name matches
     ];
     const canvas = [canvasStudent("Alexander Blakeney", 301)];
@@ -164,7 +164,7 @@ describe("matchLotteryToCanvas", () => {
     expect(result.noLotteryEntries[0].points).toBe(0);
   });
 
-  test("lottery entries below threshold appear in unmatchedLottery", () => {
+  test("lottery entries below threshold appear in unmatchedLottery with bestMatch info", () => {
     const lottery = [lotteryEntry("Completely Different", 3, 5)];
     const canvas = [canvasStudent("Daniel Kim", 101)];
 
@@ -174,5 +174,45 @@ describe("matchLotteryToCanvas", () => {
     expect(result.unmatchedLottery).toHaveLength(1);
     expect(result.unmatchedLottery[0].name).toBe("Completely Different");
     expect(result.unmatchedLottery[0].displaced).toBe(false);
+    // bestMatch and bestScore are still populated even when below threshold
+    expect(result.unmatchedLottery[0].bestMatch).toBe("Daniel Kim");
+    expect(result.unmatchedLottery[0].bestScore).toBeGreaterThan(0);
+  });
+
+  test("empty lottery entries returns empty matched and all Canvas as noLotteryEntries", () => {
+    const canvas = [canvasStudent("Daniel Kim", 101), canvasStudent("Jane Doe", 102)];
+
+    const result = matchLotteryToCanvas([], canvas);
+
+    expect(result.matched).toHaveLength(0);
+    expect(result.unmatchedLottery).toHaveLength(0);
+    expect(result.noLotteryEntries).toHaveLength(2);
+    expect(result.ties).toHaveLength(0);
+  });
+
+  test("empty Canvas enrollments returns all lottery as unmatched", () => {
+    const lottery = [lotteryEntry("Daniel W. Kim", 18, 21)];
+
+    const result = matchLotteryToCanvas(lottery, []);
+
+    expect(result.matched).toHaveLength(0);
+    expect(result.unmatchedLottery).toHaveLength(1);
+    expect(result.noLotteryEntries).toHaveLength(0);
+    expect(result.ties).toHaveLength(0);
+  });
+
+  test("exact ties are flagged for manual review", () => {
+    // Two lottery entries that produce the exact same score for the same Canvas student
+    const lottery = [
+      lotteryEntry("James Smith", 10, 20),
+      lotteryEntry("James Smith", 5, 8), // same name, different stats
+    ];
+    const canvas = [canvasStudent("James Smith", 201)];
+
+    const result = matchLotteryToCanvas(lottery, canvas);
+
+    expect(result.ties).toHaveLength(1);
+    expect(result.ties[0].canvasName).toBe("James Smith");
+    expect(result.ties[0].entries).toContain("James Smith");
   });
 });
