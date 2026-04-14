@@ -346,6 +346,7 @@ function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
 
     const canvasId = candidate.bestMatch.userId;
     const existing = claimsByCanvasId.get(canvasId);
+    // Strictly greater: on equal scores, first-in wins (stable ordering)
     if (!existing || candidate.bestScore > existing.bestScore) {
       claimsByCanvasId.set(canvasId, candidate);
     }
@@ -368,10 +369,10 @@ function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
         confidence: candidate.bestScore,
       });
     } else {
+      // Was this entry above threshold but lost to a higher-confidence claim?
       const displaced =
         candidate.bestMatch != null &&
-        candidate.bestScore >= MIN_CONFIDENCE &&
-        !winners.has(candidate);
+        candidate.bestScore >= MIN_CONFIDENCE;
       unmatchedLottery.push({
         name: candidate.lotteryEntry._id,
         calls: candidate.lotteryEntry.count,
