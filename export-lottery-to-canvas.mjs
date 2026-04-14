@@ -244,6 +244,10 @@ function parseNameParts(name) {
   };
 }
 
+// Minimum confidence score (0-100) for a name match to be accepted.
+// Referenced by both scoreNameMatch (cap logic) and matchLotteryToCanvas (threshold).
+const MIN_CONFIDENCE = 70;
+
 /**
  * Score how well two names match
  */
@@ -282,7 +286,9 @@ function scoreNameMatch(name1Parts, name2Parts) {
       return Math.min(60, Math.round(firstSim * 0.4 + lastSim * 0.6));
     }
 
-    // Weighted average: last name is a stronger identifier than first name
+    // Weighted average: last name is a stronger identifier than first name.
+    // Use max of component vs raw so component scoring only raises scores —
+    // the hard cap above already handles the false-positive prevention.
     const componentScore = Math.round(firstSim * 0.4 + lastSim * 0.6);
     const rawSim = similarity(name1Parts.normalized, name2Parts.normalized);
     return Math.max(componentScore, rawSim);
@@ -313,8 +319,6 @@ function scoreNameMatch(name1Parts, name2Parts) {
  *   - Single-part names fall back to raw Levenshtein similarity.
  */
 function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
-  const MIN_CONFIDENCE = 70;
-
   // Pre-parse Canvas names
   const canvasParsed = canvasEnrollments.map((e) => ({
     ...e,
@@ -340,15 +344,25 @@ function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
   }
 
   // === Pass 2: Resolve — deduplicate claims per Canvas student ===
-  const claimsByCanvasId = new Map();
+  const claimsByCanvasId = new Map();  // canvasUserId → best candidate
+  const ties = [];                     // tied claims requiring manual review
   for (const candidate of candidates) {
     if (!candidate.bestMatch || candidate.bestScore < MIN_CONFIDENCE) continue;
 
     const canvasId = candidate.bestMatch.userId;
     const existing = claimsByCanvasId.get(canvasId);
-    // Strictly greater: on equal scores, first-in wins (stable ordering)
-    if (!existing || candidate.bestScore > existing.bestScore) {
+    if (!existing) {
       claimsByCanvasId.set(canvasId, candidate);
+    } else if (candidate.bestScore > existing.bestScore) {
+      claimsByCanvasId.set(canvasId, candidate);
+    } else if (candidate.bestScore === existing.bestScore) {
+      // Exact tie — flag for manual review instead of silently picking one
+      ties.push({
+        canvasName: candidate.bestMatch.name,
+        canvasUserId: canvasId,
+        entries: [existing.lotteryEntry._id, candidate.lotteryEntry._id],
+        score: candidate.bestScore,
+      });
     }
   }
 
@@ -395,7 +409,7 @@ function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
       points: 0,
     }));
 
-  return { matched, unmatchedLottery, noLotteryEntries };
+  return { matched, unmatchedLottery, noLotteryEntries, ties };
 }
 
 /**
@@ -566,13 +580,16 @@ async function processCourse(courseName, options = {}) {
 
   // Step 3: Match lottery names to Canvas students
   console.log("Matching students...");
-  const { matched, unmatchedLottery, noLotteryEntries } = matchLotteryToCanvas(
+  const { matched, unmatchedLottery, noLotteryEntries, ties } = matchLotteryToCanvas(
     lotteryCounts,
     canvasEnrollments
   );
   console.log(`  Matched: ${matched.length}`);
   console.log(`  Unmatched lottery entries: ${unmatchedLottery.length}`);
   console.log(`  Canvas students with no lottery entries: ${noLotteryEntries.length}`);
+  if (ties.length > 0) {
+    console.log(`  Matching ties requiring review: ${ties.length}`);
+  }
 
   // Step 3.5: Fetch all individual lottery entries for detailed comments
   console.log("Fetching individual lottery entries...");
@@ -677,6 +694,20 @@ async function processCourse(courseName, options = {}) {
   }
 
   // === WARNINGS ===
+
+  // Matching ties — require manual review
+  if (ties.length > 0) {
+    console.log("\n" + "!".repeat(70));
+    console.log("!!  ACTION REQUIRED: Matching ties detected — manual review needed  !!");
+    console.log("!".repeat(70));
+    console.log("Multiple lottery entries matched the same Canvas student with identical");
+    console.log("confidence. The first entry was kept, but this may be wrong.\n");
+    for (const tie of ties) {
+      console.log(`  Canvas: ${tie.canvasName} (score: ${tie.score}%)`);
+      console.log(`    Tied entries: ${tie.entries.join(", ")}`);
+    }
+    console.log("");
+  }
 
   // Canvas students with NO lottery entries — prominent warning
   if (noLotteryEntries.length > 0) {
@@ -990,4 +1021,4 @@ if (process.argv[1] === __filename) {
 }
 
 // Exports for testing
-export { parseNameParts, scoreNameMatch, matchLotteryToCanvas };
+export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas };
