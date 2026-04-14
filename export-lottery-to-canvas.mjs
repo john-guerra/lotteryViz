@@ -271,17 +271,48 @@ function scoreNameMatch(name1Parts, name2Parts) {
     return 90;
   }
 
-  // Fuzzy match on full normalized name
-  const sim = similarity(name1Parts.normalized, name2Parts.normalized);
-  return sim;
+  // Component-aware scoring: compare first and last names independently
+  // to avoid false positives from shared first names (e.g. "Daniel Luo" ↔ "Daniel Kim")
+  if (name1Parts.parts.length >= 2 && name2Parts.parts.length >= 2) {
+    const firstSim = similarity(name1Parts.firstName, name2Parts.firstName);
+    const lastSim = similarity(name1Parts.lastName, name2Parts.lastName);
+
+    // Different last names → cap below MIN_CONFIDENCE to prevent false positives
+    if (lastSim < 50) {
+      return Math.min(60, Math.round(firstSim * 0.4 + lastSim * 0.6));
+    }
+
+    // Weighted average: last name is a stronger identifier than first name
+    const componentScore = Math.round(firstSim * 0.4 + lastSim * 0.6);
+    const rawSim = similarity(name1Parts.normalized, name2Parts.normalized);
+    return Math.max(componentScore, rawSim);
+  }
+
+  // Fallback for single-part names: raw similarity on full string
+  return similarity(name1Parts.normalized, name2Parts.normalized);
 }
 
 /**
- * Match lottery names to Canvas enrollments
+ * Match lottery names to Canvas enrollments using a two-pass algorithm.
+ *
+ * Matching strategy:
+ *   Pass 1 (Bet) — For each lottery entry, find the highest-scoring Canvas
+ *     student above MIN_CONFIDENCE. Multiple lottery entries may claim the
+ *     same Canvas student at this stage.
+ *   Pass 2 (Resolve) — Group claims by Canvas userId. When multiple lottery
+ *     entries claim the same student, keep only the highest confidence match.
+ *     Displaced losers move to unmatchedLottery with a `displaced` flag.
+ *
+ * Scoring (scoreNameMatch):
+ *   - Exact normalized name match → 100
+ *   - All name parts found in other name → 95
+ *   - First + last name exact match → 90
+ *   - Component-aware: firstName (40%) + lastName (60%), with a hard cap at
+ *     60 when last names clearly differ (similarity < 50) — prevents false
+ *     positives from shared first names like "Daniel Luo" ↔ "Daniel Kim".
+ *   - Single-part names fall back to raw Levenshtein similarity.
  */
 function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
-  const matched = [];
-  const unmatchedLottery = [];
   const MIN_CONFIDENCE = 70;
 
   // Pre-parse Canvas names
@@ -290,6 +321,8 @@ function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
     parsed: parseNameParts(e.name),
   }));
 
+  // === Pass 1: Bet — compute best Canvas match for each lottery entry ===
+  const candidates = [];
   for (const lotteryEntry of lotteryCounts) {
     const lotteryParsed = parseNameParts(lotteryEntry._id);
     let bestMatch = null;
@@ -303,22 +336,49 @@ function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
       }
     }
 
-    if (bestMatch && bestScore >= MIN_CONFIDENCE) {
+    candidates.push({ lotteryEntry, bestMatch, bestScore });
+  }
+
+  // === Pass 2: Resolve — deduplicate claims per Canvas student ===
+  const claimsByCanvasId = new Map();
+  for (const candidate of candidates) {
+    if (!candidate.bestMatch || candidate.bestScore < MIN_CONFIDENCE) continue;
+
+    const canvasId = candidate.bestMatch.userId;
+    const existing = claimsByCanvasId.get(canvasId);
+    if (!existing || candidate.bestScore > existing.bestScore) {
+      claimsByCanvasId.set(canvasId, candidate);
+    }
+  }
+
+  const winners = new Set(claimsByCanvasId.values());
+
+  // === Build results ===
+  const matched = [];
+  const unmatchedLottery = [];
+
+  for (const candidate of candidates) {
+    if (winners.has(candidate)) {
       matched.push({
-        lotteryName: lotteryEntry._id,
-        canvasName: bestMatch.name,
-        canvasUserId: bestMatch.userId,
-        calls: lotteryEntry.count,
-        points: lotteryEntry.sum,
-        confidence: bestScore,
+        lotteryName: candidate.lotteryEntry._id,
+        canvasName: candidate.bestMatch.name,
+        canvasUserId: candidate.bestMatch.userId,
+        calls: candidate.lotteryEntry.count,
+        points: candidate.lotteryEntry.sum,
+        confidence: candidate.bestScore,
       });
     } else {
+      const displaced =
+        candidate.bestMatch != null &&
+        candidate.bestScore >= MIN_CONFIDENCE &&
+        !winners.has(candidate);
       unmatchedLottery.push({
-        name: lotteryEntry._id,
-        calls: lotteryEntry.count,
-        points: lotteryEntry.sum,
-        bestMatch: bestMatch?.name,
-        bestScore,
+        name: candidate.lotteryEntry._id,
+        calls: candidate.lotteryEntry.count,
+        points: candidate.lotteryEntry.sum,
+        bestMatch: candidate.bestMatch?.name,
+        bestScore: candidate.bestScore,
+        displaced,
       });
     }
   }
@@ -615,12 +675,30 @@ async function processCourse(courseName, options = {}) {
     );
   }
 
-  // Show unmatched lottery entries
+  // === WARNINGS ===
+
+  // Canvas students with NO lottery entries — prominent warning
+  if (noLotteryEntries.length > 0) {
+    console.log("\n" + "!".repeat(70));
+    console.log("!!  WARNING: Canvas students with NO lottery entries in MongoDB  !!");
+    console.log("!".repeat(70));
+    console.log("These students are enrolled in Canvas but have no matching lottery record.");
+    console.log("They will receive 0 points.\n");
+    for (const entry of noLotteryEntries) {
+      console.log(`  [!] ${entry.canvasName}`);
+    }
+    console.log("");
+  }
+
+  // MongoDB entries not matched to Canvas — informational
   if (unmatchedLottery.length > 0) {
     console.log("\n--- Unmatched Lottery Entries (not in Canvas) ---\n");
     for (const entry of unmatchedLottery) {
+      const reason = entry.displaced
+        ? "DISPLACED by higher-confidence match"
+        : "no Canvas match found";
       console.log(
-        `  ${entry.name} (${entry.calls} calls, ${entry.points} pts) - Best match: ${entry.bestMatch || "none"} (${entry.bestScore}%)`
+        `  ${entry.name} (${entry.calls} calls, ${entry.points} pts) - ${reason} | Best: ${entry.bestMatch || "none"} (${entry.bestScore}%)`
       );
     }
   }
@@ -904,4 +982,11 @@ async function main() {
   process.exit(results.every((r) => r.success) ? 0 : 1);
 }
 
-main();
+// Run CLI only when executed directly, not when imported for testing
+const __filename = fileURLToPath(import.meta.url);
+if (process.argv[1] === __filename) {
+  main();
+}
+
+// Exports for testing
+export { parseNameParts, scoreNameMatch, matchLotteryToCanvas };
