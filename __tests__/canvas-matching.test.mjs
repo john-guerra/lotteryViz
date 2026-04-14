@@ -145,9 +145,8 @@ describe("matchLotteryToCanvas", () => {
 
     // The loser should be displaced
     const displaced = result.unmatchedLottery.find((u) => u.name === "Alex Blakeney");
-    if (displaced && displaced.bestScore >= 70) {
-      expect(displaced.displaced).toBe(true);
-    }
+    expect(displaced).toBeDefined();
+    expect(displaced.displaced).toBe(true);
   });
 
   test("Canvas students with no lottery match appear in noLotteryEntries", () => {
