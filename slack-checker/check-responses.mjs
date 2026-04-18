@@ -32,21 +32,22 @@ import { loadStudentRoster, matchNames, getAvailableCourses } from "./matcher.mj
 const { MongoClient } = mongodb;
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost:27017";
 
-const TWENTY_FOUR_HOURS_SEC = 24 * 60 * 60;
+const DEFAULT_HOURS = 24;
 
 function printUsage() {
   console.log(`
 Usage: node slack-checker/check-responses.mjs [options] <thread-url> <course> [points]
 
 Arguments:
-  thread-url  Slack thread URL (e.g., https://team.slack.com/archives/C123ABC/p1234567890)
-  course      Course name from students.mjs
-  points      Points to award (default: 2)
+  thread-url    Slack thread URL (e.g., https://team.slack.com/archives/C123ABC/p1234567890)
+  course        Course name from students.mjs
+  points        Points to award (default: 2)
 
 Options:
-  --dry-run   Preview matches without writing to database
-  --yes, -y   Skip confirmation prompt (use with caution)
-  --help, -h  Show this help message
+  --hours <n>   Time window in hours after the parent message (default: ${DEFAULT_HOURS})
+  --dry-run     Preview matches without writing to database
+  --yes, -y     Skip confirmation prompt (use with caution)
+  --help, -h    Show this help message
 
 Available courses: ${getAvailableCourses().join(", ")}
 
@@ -118,6 +119,7 @@ function parseArgs(args) {
     dryRun: false,
     skipConfirm: false,
     help: false,
+    hours: DEFAULT_HOURS,
     threadUrl: null,
     course: null,
     points: 2,
@@ -125,9 +127,12 @@ function parseArgs(args) {
 
   const positional = [];
 
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
     if (arg === "--dry-run") {
       options.dryRun = true;
+    } else if (arg === "--hours" && i + 1 < args.length) {
+      options.hours = parseFloat(args[++i]);
     } else if (arg === "--yes" || arg === "-y") {
       options.skipConfirm = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -163,6 +168,11 @@ async function main() {
     process.exit(1);
   }
 
+  if (isNaN(options.hours) || options.hours <= 0) {
+    console.error("Error: Hours must be a positive number");
+    process.exit(1);
+  }
+
   if (options.dryRun) {
     console.log("=== DRY RUN MODE (no database changes will be made) ===\n");
   }
@@ -170,6 +180,7 @@ async function main() {
   console.log(`Checking thread: ${options.threadUrl}`);
   console.log(`Course: ${options.course}`);
   console.log(`Points per responder: ${options.points}`);
+  console.log(`Time window: ${options.hours} hours`);
   console.log("");
 
   // Load student roster
@@ -200,12 +211,12 @@ async function main() {
   }
 
   const parentTs = parseFloat(parentMessage.ts);
-  const cutoffTs = parentTs + TWENTY_FOUR_HOURS_SEC;
+  const cutoffTs = parentTs + options.hours * 60 * 60;
   const parentDate = new Date(parentTs * 1000);
   const cutoffDate = new Date(cutoffTs * 1000);
 
   console.log(`Parent message posted: ${parentDate.toLocaleString()}`);
-  console.log(`24-hour cutoff: ${cutoffDate.toLocaleString()}`);
+  console.log(`${options.hours}-hour cutoff: ${cutoffDate.toLocaleString()}`);
   console.log("");
 
   // Get thread replies
@@ -223,7 +234,7 @@ async function main() {
     return replyTs <= cutoffTs;
   });
 
-  console.log(`Found ${validReplies.length} replies within 24 hours (${replies.length} total replies).`);
+  console.log(`Found ${validReplies.length} replies within ${options.hours} hours (${replies.length} total replies).`);
   console.log("");
 
   if (validReplies.length === 0) {
