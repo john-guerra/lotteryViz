@@ -17,6 +17,12 @@ describe("extractThreadUrl()", () => {
     expect(extractThreadUrl("")).toBeNull();
     expect(extractThreadUrl(undefined)).toBeNull();
   });
+  test("returns null for a prefix with no URL", () => {
+    expect(extractThreadUrl("Responded to Slack thread: ")).toBeNull();
+  });
+  test("returns null for non-string input", () => {
+    expect(extractThreadUrl(42)).toBeNull();
+  });
 });
 
 describe("truncateSnippet()", () => {
@@ -28,5 +34,8 @@ describe("truncateSnippet()", () => {
   });
   test("handles empty input", () => {
     expect(truncateSnippet("")).toBe("");
+  });
+  test("handles null input", () => {
+    expect(truncateSnippet(null)).toBe("");
   });
 });
