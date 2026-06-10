@@ -208,28 +208,6 @@ async function getAssignmentGroups(courseId) {
 }
 
 /**
- * Format point history entries for comment
- */
-function formatPointHistory(entries) {
-  if (!entries || entries.length === 0) {
-    return "  (No entries)";
-  }
-
-  return entries
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    .map((e) => {
-      const date = new Date(e.timestamp).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-      const pts = e.grade > 0 ? `+${e.grade}` : e.grade;
-      const reason = e.reason || "Points in class";
-      return `  • ${date}: ${pts} pts - ${reason}`;
-    })
-    .join("\n");
-}
-
-/**
  * Parse a name into parts for matching
  */
 function parseNameParts(name) {
