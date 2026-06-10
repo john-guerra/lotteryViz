@@ -28,7 +28,7 @@ try {
 // Import after loading env
 const { parseSlackUrl, getThreadReplies, getParentMessage, getUserDisplayNames } = await import("./slack-api.mjs");
 import { loadStudentRoster, matchNames, getAvailableCourses } from "./matcher.mjs";
-import { recordPost, markAwarded, isAwarded } from "./ledger.mjs";
+import { recordPost, markAwarded, isAwarded, getPosts } from "./ledger.mjs";
 import { loadScanConfig } from "./config.js";
 
 const { MongoClient } = mongodb;
@@ -80,6 +80,92 @@ async function confirm(message) {
       resolve(answer.toLowerCase().startsWith("y"));
     });
   });
+}
+
+/** Prompt for a line of input, returning the trimmed answer (or fallback). */
+async function ask(message, fallback = "") {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(message, (answer) => {
+      rl.close();
+      const trimmed = (answer || "").trim();
+      resolve(trimmed === "" ? fallback : trimmed);
+    });
+  });
+}
+
+/** Show a numbered course list and return the chosen course key (or null). */
+async function pickCourse() {
+  const courses = getAvailableCourses();
+  console.log("\nCourses:");
+  courses.forEach((c, i) => console.log(`  ${i + 1}) ${c}`));
+  const choice = await ask("Pick a course (number): ");
+  const idx = parseInt(choice, 10) - 1;
+  return courses[idx] || null;
+}
+
+/** Menu action: award points from a thread URL (prompts for missing values). */
+async function menuAwardFromUrl() {
+  const threadUrl = await ask("Slack thread URL: ");
+  if (!threadUrl) return console.log("No URL given.");
+  const course = await pickCourse();
+  if (!course) return console.log("No course selected.");
+  const points = parseInt(await ask("Points per responder [2]: ", "2"), 10);
+  const hours = parseFloat(await ask(`Time window in hours [${DEFAULT_HOURS}]: `, String(DEFAULT_HOURS)));
+  const topUp = (await ask("Top-up new responders only if already awarded? (y/N): ", "n"))
+    .toLowerCase()
+    .startsWith("y");
+  await awardFromThread({ threadUrl, course, points, hours, dryRun: false, skipConfirm: false, topUp });
+}
+
+/** Menu action: record a post by URL so its text seeds the scanner; optional award. */
+async function menuAddByUrl() {
+  const threadUrl = await ask("Slack thread URL to add: ");
+  if (!threadUrl) return console.log("No URL given.");
+  const course = await pickCourse();
+  if (!course) return console.log("No course selected.");
+  let parsed;
+  try {
+    parsed = parseSlackUrl(threadUrl);
+  } catch (error) {
+    return console.error(error.message);
+  }
+  const parent = await getParentMessage(parsed.channelId, parsed.messageTs);
+  await recordPost(course, {
+    threadTs: parsed.messageTs,
+    url: threadUrl,
+    channel: parsed.channelId,
+    text: parent.text || "",
+    source: "manual",
+    awarded: false,
+  });
+  console.log(`\nRecorded as a reference example:\n  "${(parent.text || "").slice(0, 80)}"`);
+  const alsoAward = (await ask("Award points for this post now? (y/N): ", "n")).toLowerCase().startsWith("y");
+  if (alsoAward) {
+    const points = parseInt(await ask("Points per responder [2]: ", "2"), 10);
+    const hours = parseFloat(await ask(`Time window in hours [${DEFAULT_HOURS}]: `, String(DEFAULT_HOURS)));
+    await awardFromThread({ threadUrl, course, points, hours, dryRun: false, skipConfirm: false });
+  }
+}
+
+/** Menu action: print every known post for a course with its grading status. */
+async function menuListPosts() {
+  const course = await pickCourse();
+  if (!course) return console.log("No course selected.");
+  const posts = await getPosts(course);
+  if (posts.length === 0) return console.log("\nNo posts recorded for this course yet.");
+  console.log(`\nPosts for ${course}:\n`);
+  console.log("Date".padEnd(12) + "Status".padEnd(10) + "Pts".padStart(4) + "  " + "Stud".padStart(4) + "  Post");
+  console.log("-".repeat(72));
+  for (const p of posts) {
+    const when = p.awardedAt ? new Date(p.awardedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : (p.addedAt ? new Date(p.addedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—");
+    const status = p.awarded ? "awarded" : "added";
+    const pts = p.awarded ? String(p.points ?? "") : "";
+    const stud = p.awarded ? String(p.studentCount ?? "") : "";
+    const snippet = (p.text || "").replace(/\s+/g, " ").slice(0, 40);
+    console.log(when.padEnd(12) + status.padEnd(10) + pts.padStart(4) + "  " + stud.padStart(4) + "  " + snippet);
+  }
 }
 
 /**
