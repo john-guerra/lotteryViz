@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "canvas-lms": {
+      "command": "npx",
+      "args": ["-y", "canvas-mcp-server@2.2.3"],
+      "env": { "CANVAS_API_TOKEN": "${CANVAS_API_TOKEN}", "CANVAS_DOMAIN": "${CANVAS_DOMAIN}" }
+    },
+    "canvas-extras": {
+      "command": "node",
+      "args": ["/Users/aguerra/workspace/aiCoding_Course/tools/canvas-extras-mcp/index.js"],
+      "env": { "CANVAS_API_TOKEN": "${CANVAS_API_TOKEN}", "CANVAS_DOMAIN": "${CANVAS_DOMAIN}" }
+    }
+  }
+}
