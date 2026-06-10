@@ -111,7 +111,9 @@ async function menuAwardFromUrl() {
   const course = await pickCourse();
   if (!course) return console.log("No course selected.");
   const points = parseInt(await ask("Points per responder [2]: ", "2"), 10);
+  if (isNaN(points) || points < 1) return console.log("Invalid points — must be a positive integer.");
   const hours = parseFloat(await ask(`Time window in hours [${DEFAULT_HOURS}]: `, String(DEFAULT_HOURS)));
+  if (isNaN(hours) || hours <= 0) return console.log("Invalid hours — must be a positive number.");
   const topUp = (await ask("Top-up new responders only if already awarded? (y/N): ", "n"))
     .toLowerCase()
     .startsWith("y");
@@ -143,8 +145,11 @@ async function menuAddByUrl() {
   const alsoAward = (await ask("Award points for this post now? (y/N): ", "n")).toLowerCase().startsWith("y");
   if (alsoAward) {
     const points = parseInt(await ask("Points per responder [2]: ", "2"), 10);
+    if (isNaN(points) || points < 1) return console.log("Invalid points — must be a positive integer.");
     const hours = parseFloat(await ask(`Time window in hours [${DEFAULT_HOURS}]: `, String(DEFAULT_HOURS)));
-    await awardFromThread({ threadUrl, course, points, hours, dryRun: false, skipConfirm: false });
+    if (isNaN(hours) || hours <= 0) return console.log("Invalid hours — must be a positive number.");
+    // Operator explicitly chose to award this just-recorded post → bypass dedup.
+    await awardFromThread({ threadUrl, course, points, hours, dryRun: false, skipConfirm: false, topUp: true });
   }
 }
 
