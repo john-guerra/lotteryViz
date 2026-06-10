@@ -128,3 +128,56 @@ export async function getUserDisplayNames(userIds) {
 
   return nameMap;
 }
+
+/**
+ * List public channels as a Map of "#name" → channel id (paginated).
+ * Requires the bot token to have channels:read.
+ */
+export async function listChannels() {
+  const map = new Map();
+  let cursor;
+  do {
+    const res = await client.conversations.list({
+      types: "public_channel",
+      limit: 1000,
+      exclude_archived: true,
+      cursor,
+    });
+    if (!res.ok) throw new Error(`Slack API error: ${res.error}`);
+    for (const c of res.channels) map.set(`#${c.name}`, c.id);
+    cursor = res.response_metadata?.next_cursor || undefined;
+  } while (cursor);
+  return map;
+}
+
+/**
+ * Fetch top-level messages in a channel within [oldest, latest] (unix seconds,
+ * as strings). Paginated. The bot must be a member of the channel.
+ * @returns {Promise<Array>} message objects (parents only; no thread replies)
+ */
+export async function getChannelHistory(channelId, { oldest, latest } = {}) {
+  const messages = [];
+  let cursor;
+  do {
+    const res = await client.conversations.history({
+      channel: channelId,
+      oldest,
+      latest,
+      limit: 200,
+      cursor,
+    });
+    if (!res.ok) throw new Error(`Slack API error: ${res.error}`);
+    for (const m of res.messages) {
+      if (m.type === "message" && !m.subtype && m.text) messages.push(m);
+    }
+    cursor = res.response_metadata?.next_cursor || undefined;
+  } while (cursor);
+  return messages;
+}
+
+/** Get the canonical permalink URL for a message (used to award it later). */
+export async function getPermalink(channelId, messageTs) {
+  const r = await client.chat.getPermalink({ channel: channelId, message_ts: messageTs });
+  if (!r.ok) throw new Error(`Slack API error: ${r.error}`);
+  return r.permalink;
+}
