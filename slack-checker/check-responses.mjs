@@ -162,7 +162,7 @@ export async function awardFromThread(options) {
     parsed = parseSlackUrl(options.threadUrl);
   } catch (error) {
     console.error(error.message);
-    return { awarded: 0, threadTs: null };
+    return { ok: false, awarded: 0, threadTs: null };
   }
 
   // Dedup guard: skip if already awarded (unless dry-run or top-up)
@@ -171,7 +171,7 @@ export async function awardFromThread(options) {
       `\nThis post is already awarded for ${options.course}. ` +
         `Re-run with the "top-up new responders" option to add only new repliers.`
     );
-    return { awarded: 0, threadTs: parsed.messageTs };
+    return { ok: true, awarded: 0, threadTs: parsed.messageTs };
   }
 
   if (options.dryRun) {
@@ -190,7 +190,7 @@ export async function awardFromThread(options) {
     roster = loadStudentRoster(options.course);
   } catch (error) {
     console.error(error.message);
-    return { awarded: 0, threadTs: parsed.messageTs };
+    return { ok: false, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Get parent message to determine time boundary
@@ -199,7 +199,7 @@ export async function awardFromThread(options) {
     parentMessage = await getParentMessage(parsed.channelId, parsed.messageTs);
   } catch (error) {
     console.error(`Error fetching parent message: ${error.message}`);
-    return { awarded: 0, threadTs: parsed.messageTs };
+    return { ok: false, awarded: 0, threadTs: parsed.messageTs };
   }
 
   const parentTs = parseFloat(parentMessage.ts);
@@ -217,7 +217,7 @@ export async function awardFromThread(options) {
     replies = await getThreadReplies(parsed.channelId, parsed.messageTs);
   } catch (error) {
     console.error(`Error fetching replies: ${error.message}`);
-    return { awarded: 0, threadTs: parsed.messageTs };
+    return { ok: false, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Filter replies within 24 hours
@@ -231,7 +231,7 @@ export async function awardFromThread(options) {
 
   if (validReplies.length === 0) {
     console.log("No replies to process.");
-    return { awarded: 0, threadTs: parsed.messageTs };
+    return { ok: true, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Get unique responders (by user ID to avoid duplicates)
@@ -289,14 +289,14 @@ export async function awardFromThread(options) {
 
   if (matched.length === 0) {
     console.log("No students matched - nothing to do.");
-    return { awarded: 0, threadTs: parsed.messageTs };
+    return { ok: true, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Dry run stops here
   if (options.dryRun) {
     console.log("=== DRY RUN COMPLETE (no changes made) ===");
     console.log("Remove --dry-run flag to actually award points.");
-    return { awarded: 0, threadTs: parsed.messageTs };
+    return { ok: true, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Confirmation prompt
@@ -306,7 +306,7 @@ export async function awardFromThread(options) {
     );
     if (!confirmed) {
       console.log("Aborted. No changes made.");
-      return { awarded: 0, threadTs: parsed.messageTs };
+      return { ok: true, awarded: 0, threadTs: parsed.messageTs };
     }
     console.log("");
   }
@@ -327,23 +327,34 @@ export async function awardFromThread(options) {
   console.log("");
   console.log(`=== COMPLETE: ${awardedCount} students awarded ${options.points} point(s) each ===`);
 
-  // Record results into the ledger (only on real awards)
-  if (!options.dryRun && awardedCount > 0) {
-    await recordPost(options.course, {
-      threadTs: parsed.messageTs,
-      url: options.threadUrl,
-      channel: parsed.channelId,
-      text: parentMessage.text || "",
-      source: "award",
-      awarded: true,
-    });
-    await markAwarded(options.course, parsed.messageTs, {
-      points: options.points,
-      studentCount: awardedCount,
-    });
+  // Record results into the ledger (only on real awards). A ledger write
+  // failure must not crash after points were already inserted into grades —
+  // warn loudly instead, since a missing ledger row risks a future double-award.
+  if (awardedCount > 0) {
+    try {
+      await recordPost(options.course, {
+        threadTs: parsed.messageTs,
+        url: options.threadUrl,
+        channel: parsed.channelId,
+        text: parentMessage.text || "",
+        source: "award",
+        awarded: true,
+      });
+      await markAwarded(options.course, parsed.messageTs, {
+        points: options.points,
+        studentCount: awardedCount,
+      });
+    } catch (ledgerError) {
+      console.warn(
+        `\nWarning: points were awarded but the ledger write failed: ${ledgerError.message}`
+      );
+      console.warn(
+        "Re-running this thread may double-award. Verify the slack_posts ledger before retrying."
+      );
+    }
   }
 
-  return { awarded: awardedCount, threadTs: parsed.messageTs };
+  return { ok: true, awarded: awardedCount, threadTs: parsed.messageTs };
 }
 
 async function main() {
@@ -370,8 +381,8 @@ async function main() {
     process.exit(1);
   }
 
-  await awardFromThread(options);
-  process.exit(0);
+  const result = await awardFromThread(options);
+  process.exit(result.ok ? 0 : 1);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
