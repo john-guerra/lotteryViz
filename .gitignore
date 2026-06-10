@@ -82,6 +82,9 @@ db/name-mapping.json
 # Canvas config
 canvas-config.json
 
+# Slack scan config (channels, term dates, instructor id)
+slack-checker/config.json
+
 # Environment files
 front/.env.local
 
