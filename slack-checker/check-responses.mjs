@@ -443,6 +443,27 @@ export async function awardFromThread(options) {
   return { ok: true, awarded: awardedCount, threadTs: parsed.messageTs };
 }
 
+/** Top-level interactive menu. */
+async function runMenu() {
+  console.log("\n=== Slack Participation Points ===");
+  console.log("  1) Scan for new point-offer posts        (coming soon)");
+  console.log("  2) Award points from a thread URL");
+  console.log("  3) Add post by URL (teach the scanner)");
+  console.log("  4) List posts & grading status");
+  console.log("  5) Semester setup / fix config           (coming soon)");
+  const choice = await ask("\nChoose an option (1-5): ");
+  switch (choice) {
+    case "2": return menuAwardFromUrl();
+    case "3": return menuAddByUrl();
+    case "4": return menuListPosts();
+    case "1":
+    case "5":
+      return console.log("That option arrives in a later update.");
+    default:
+      return console.log("Unknown option.");
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const options = parseArgs(args);
@@ -452,6 +473,12 @@ async function main() {
     process.exit(0);
   }
 
+  // No required args on an interactive terminal → show the menu.
+  if ((!options.threadUrl || !options.course) && process.stdin.isTTY) {
+    await runMenu();
+    process.exit(0);
+  }
+  // Non-interactive (or scripted) with missing args → usage and exit.
   if (!options.threadUrl || !options.course) {
     printUsage();
     process.exit(1);
