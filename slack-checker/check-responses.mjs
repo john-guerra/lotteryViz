@@ -29,8 +29,6 @@ try {
 const { parseSlackUrl, getThreadReplies, getParentMessage, getUserDisplayNames, listChannels, getChannelHistory, getPermalink } = await import("./slack-api.mjs");
 import { loadStudentRoster, matchNames, getAvailableCourses } from "./matcher.mjs";
 import { recordPost, markAwarded, isAwarded, getPosts } from "./ledger.mjs";
-// eslint-disable-next-line no-unused-vars -- scaffolding for the Phase 2 scan flow
-import { loadScanConfig } from "./config.js";
 import { scanOffers } from "./scan.mjs";
 
 const { MongoClient } = mongodb;
