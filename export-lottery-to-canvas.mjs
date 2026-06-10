@@ -11,6 +11,8 @@
 
 import myDB from "./db/myDB.js";
 import { classes } from "./front/src/students.mjs";
+import { enrichPointHistory, computeParticipation } from "./slack-checker/ledger-format.mjs";
+import { getAwardedPosts } from "./slack-checker/ledger.mjs";
 import {
   normalizeName,
   stripNoiseWords,
@@ -567,6 +569,16 @@ async function processCourse(courseName, options = {}) {
     return { success: false, error: error.message };
   }
 
+  // Slack-post ledger for readable participation history (empty if none yet).
+  let awardedPosts = [];
+  let postsByUrl = {};
+  try {
+    awardedPosts = await getAwardedPosts(courseName);
+    postsByUrl = Object.fromEntries(awardedPosts.map((p) => [p.url, p]));
+  } catch (error) {
+    console.log("  Note: could not load Slack ledger:", error.message);
+  }
+
   // Step 2: Get Canvas enrollments
   console.log("Fetching Canvas enrollments...");
   let canvasEnrollments;
@@ -834,13 +846,18 @@ async function processCourse(courseName, options = {}) {
       const studentEntries = studentKey ? entriesByStudent.get(studentKey) || [] : [];
 
       const adjustmentNote = medianAdjustment > 0 ? ` [adjusted -${medianAdjustment}]` : "";
+      const participation = computeParticipation(studentEntries, awardedPosts);
+      const participationLine =
+        participation.total > 0
+          ? `\n🗣️ Slack participation: ${participation.responded} of ${participation.total} point-offer threads`
+          : "";
       const comment = `🤖Lottery bot | Grade: ${student.grade}
 
 📊 ${student.calls} calls, ${student.points} pts total | ${student.percentile.toFixed(1)}th %ile (median: ${stats.median} pts${adjustmentNote}, ${stats.medianCalls} calls)
-📐 Formula: median=100, above=linear to 110, below=quadratic SD curve
+📐 Formula: median=100, above=linear to 110, below=quadratic SD curve${participationLine}
 
 📋 Point History:
-${formatPointHistory(studentEntries)}`;
+${enrichPointHistory(studentEntries, postsByUrl)}`;
 
       try {
         await submitGrade(
