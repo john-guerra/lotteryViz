@@ -25,7 +25,7 @@ export function truncateSnippet(text, max = 50) {
 export function computeParticipation(entries, awardedPosts) {
   const awardedUrls = new Set(awardedPosts.map((p) => p.url));
   const respondedUrls = new Set();
-  for (const e of entries) {
+  for (const e of entries || []) {
     const url = extractThreadUrl(e.reason);
     if (url && awardedUrls.has(url)) respondedUrls.add(url);
   }
