@@ -31,6 +31,7 @@ import { loadStudentRoster, matchNames, getAvailableCourses } from "./matcher.mj
 import { recordPost, markAwarded, isAwarded, getPosts } from "./ledger.mjs";
 // eslint-disable-next-line no-unused-vars -- scaffolding for the Phase 2 scan flow
 import { loadScanConfig } from "./config.js";
+import { scanOffers } from "./scan.mjs";
 
 const { MongoClient } = mongodb;
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost:27017";
@@ -449,20 +450,80 @@ export async function awardFromThread(options) {
   return { ok: true, awarded: awardedCount, threadTs: parsed.messageTs };
 }
 
+/** Menu action: scan configured channels for offer-posts, then optionally award. */
+async function menuScanOffers() {
+  const course = await pickCourse();
+  if (!course) return console.log("No course selected.");
+
+  console.log("\nScanning Slack (this loads the local model on first run)…");
+  let result;
+  try {
+    result = await scanOffers(course, { listChannels, getChannelHistory, getPermalink });
+  } catch (error) {
+    return console.error(`Scan failed: ${error.message}`);
+  }
+
+  if (result.noReferences) {
+    console.log(
+      "\nNo reference examples yet. Use \"Add post by URL\" to teach the scanner " +
+        "your offer style (or add seedOfferPhrases to slack-checker/config.json), then scan again."
+    );
+    return;
+  }
+
+  console.log(
+    `\nScanned ${result.channelsScanned.join(", ") || "(no channels)"}; ` +
+      `embedded ${result.embeddedCount} messages.`
+  );
+  const { candidates } = result;
+  if (candidates.length === 0) return console.log("No likely point-offer posts found.");
+
+  console.log("\nLikely point-offer posts:\n");
+  candidates.forEach((c, i) => {
+    const flag = c.alreadyAwarded ? " [awarded ✓]" : c.inLedger ? " [in ledger]" : "";
+    const when = new Date(parseFloat(c.ts) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const snippet = (c.text || "").replace(/\s+/g, " ").slice(0, 50);
+    console.log(`  ${i + 1}) ${(c.score * 100).toFixed(0)}% ${when} (${c.channel})${flag}: "${snippet}"`);
+  });
+
+  const pick = await ask("\nAward which post(s)? (comma-separated numbers, or Enter to skip): ");
+  if (!pick) return console.log("No posts selected.");
+  const indices = pick.split(",").map((s) => parseInt(s.trim(), 10) - 1).filter((n) => candidates[n]);
+  if (indices.length === 0) return console.log("No valid selection.");
+
+  const points = parseInt(await ask("Points per responder [2]: ", "2"), 10);
+  if (isNaN(points) || points < 1) return console.log("Invalid points — must be a positive integer.");
+  const hours = parseFloat(await ask(`Time window in hours [${DEFAULT_HOURS}]: `, String(DEFAULT_HOURS)));
+  if (isNaN(hours) || hours <= 0) return console.log("Invalid hours — must be a positive number.");
+
+  for (const n of indices) {
+    const c = candidates[n];
+    let threadUrl;
+    try {
+      threadUrl = await getPermalink(c.channelId, c.ts);
+    } catch (error) {
+      console.error(`  Could not get permalink for #${c.channel} post: ${error.message}`);
+      continue;
+    }
+    console.log(`\n--- Awarding for: ${c.channel} "${(c.text || "").slice(0, 40)}" ---`);
+    await awardFromThread({ threadUrl, course, points, hours, dryRun: false, skipConfirm: false, topUp: c.alreadyAwarded });
+  }
+}
+
 /** Top-level interactive menu. */
 async function runMenu() {
   console.log("\n=== Slack Participation Points ===");
-  console.log("  1) Scan for new point-offer posts        (coming soon)");
+  console.log("  1) Scan for new point-offer posts");
   console.log("  2) Award points from a thread URL");
   console.log("  3) Add post by URL (teach the scanner)");
   console.log("  4) List posts & grading status");
   console.log("  5) Semester setup / fix config           (coming soon)");
   const choice = await ask("\nChoose an option (1-5): ");
   switch (choice) {
+    case "1": return menuScanOffers();
     case "2": return menuAwardFromUrl();
     case "3": return menuAddByUrl();
     case "4": return menuListPosts();
-    case "1":
     case "5":
       return console.log("That option arrives in a later update.");
     default:
