@@ -4,8 +4,9 @@ const SLACK_THREAD_PREFIX = "Responded to Slack thread: ";
 
 /** Extract the thread URL from a grade doc's reason string, or null. */
 export function extractThreadUrl(reason) {
-  if (!reason || !reason.startsWith(SLACK_THREAD_PREFIX)) return null;
-  return reason.slice(SLACK_THREAD_PREFIX.length).trim();
+  if (typeof reason !== "string" || !reason.startsWith(SLACK_THREAD_PREFIX)) return null;
+  const url = reason.slice(SLACK_THREAD_PREFIX.length).trim();
+  return url || null;
 }
 
 /** Collapse whitespace and truncate post text to a short display snippet. */
