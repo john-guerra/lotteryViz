@@ -4,7 +4,6 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { createInterface } from "readline";
-import mongodb from "mongodb";
 
 // Load .env file
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,9 +29,8 @@ const { parseSlackUrl, getThreadReplies, getParentMessage, getUserDisplayNames, 
 import { loadStudentRoster, matchNames, getAvailableCourses } from "./matcher.mjs";
 import { recordPost, markAwarded, isAwarded, getPosts } from "./ledger.mjs";
 import { scanOffers } from "./scan.mjs";
-
-const { MongoClient } = mongodb;
-const mongoUrl = process.env.MONGO_URL || "mongodb://localhost:27017";
+// Shared with the HTTP API so the award math + grade insert never drift.
+import { awardPoints, computeCutoffTs, filterRepliesWithinWindow } from "./award-service.mjs";
 
 const DEFAULT_HOURS = 24;
 
@@ -174,37 +172,6 @@ async function menuListPosts() {
 }
 
 /**
- * Award points to a student using direct MongoDB insert
- */
-async function awardPoints(studentName, course, points, reason, postDate) {
-  const dbName = "lottery_" + course;
-  const client = new MongoClient(mongoUrl, { useUnifiedTopology: true });
-
-  try {
-    await client.connect();
-    const grades = client.db(dbName).collection("grades");
-
-    const date = postDate.toDateString();
-
-    await grades.insertOne({
-      date,
-      timestamp: postDate,
-      name: studentName,
-      grade: points,
-      course,
-      reason,
-    });
-
-    return true;
-  } catch (error) {
-    console.error(`Error awarding points to ${studentName}:`, error.message);
-    return false;
-  } finally {
-    await client.close();
-  }
-}
-
-/**
  * Parse command line arguments
  */
 function parseArgs(args) {
@@ -294,7 +261,7 @@ export async function awardFromThread(options) {
   }
 
   const parentTs = parseFloat(parentMessage.ts);
-  const cutoffTs = parentTs + options.hours * 60 * 60;
+  const cutoffTs = computeCutoffTs(parentTs, options.hours);
   const parentDate = new Date(parentTs * 1000);
   const cutoffDate = new Date(cutoffTs * 1000);
 
@@ -311,11 +278,8 @@ export async function awardFromThread(options) {
     return { ok: false, awarded: 0, threadTs: parsed.messageTs };
   }
 
-  // Filter replies within 24 hours
-  const validReplies = replies.filter((reply) => {
-    const replyTs = parseFloat(reply.ts);
-    return replyTs <= cutoffTs;
-  });
+  // Filter replies within the award window
+  const validReplies = filterRepliesWithinWindow(replies, cutoffTs);
 
   console.log(`Found ${validReplies.length} replies within ${options.hours} hours (${replies.length} total replies).`);
   console.log("");
