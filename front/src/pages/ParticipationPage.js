@@ -31,16 +31,32 @@ function snippet(text, max = 90) {
 // stay readable. Uses `position: fixed` + a portal-free floating div so the
 // table's own overflow can't clip it. `pointerEvents: none` keeps the card from
 // stealing the hover (which would flicker it) or blocking the wrapped link.
+//
+// Accessibility: the card also opens on keyboard focus (anchored to the focused
+// element's box, since there's no cursor), and a resting `title` gives touch and
+// assistive tech a fallback. `title` is dropped while the card is open so mouse
+// users never see a duplicate native tooltip.
 function TextTooltip({ text, children }) {
   const [pos, setPos] = useState(null);
   if (!text) return children;
   const track = (e) => setPos({ x: e.clientX, y: e.clientY });
+  const trackFocus = (e) => {
+    const r = e.target.getBoundingClientRect();
+    setPos({ x: r.left, y: r.bottom });
+  };
+  // Flip the card above the anchor when there isn't room below it — a long post
+  // hovered near the bottom of the table would otherwise fall off-screen (the
+  // card is fixed + pointerEvents:none, so it can't be scrolled into view).
+  const flipUp = pos && window.innerHeight - pos.y < 220;
   return (
     <span
       style={{ position: "relative" }}
+      title={pos ? undefined : text}
       onMouseEnter={track}
       onMouseMove={track}
       onMouseLeave={() => setPos(null)}
+      onFocus={trackFocus}
+      onBlur={() => setPos(null)}
     >
       {children}
       {pos && (
@@ -49,9 +65,12 @@ function TextTooltip({ text, children }) {
           style={{
             position: "fixed",
             left: Math.min(pos.x + 14, window.innerWidth - 372),
-            top: pos.y + 18,
+            top: flipUp ? undefined : pos.y + 18,
+            bottom: flipUp ? window.innerHeight - pos.y + 18 : undefined,
             zIndex: 1080,
             maxWidth: 360,
+            maxHeight: "60vh",
+            overflow: "hidden",
             whiteSpace: "pre-wrap",
             background: "#212529",
             color: "#fff",
