@@ -58,6 +58,12 @@ function NavBar() {
               >
                 Admin
               </Link>
+              <Link
+                className={`nav-link ${location.pathname === "/participation" ? "active" : ""}`}
+                to="/participation"
+              >
+                Participation
+              </Link>
             </div>
           </div>
         </nav>
