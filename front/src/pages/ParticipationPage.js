@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import ParticipationPreviewModal from "../components/ParticipationPreviewModal";
+import { useCourse } from "../context/CourseContext";
 
 // Slack participation-points page.
 //   1. Posts & grading status — every ledger post and whether it is graded.
@@ -95,8 +96,7 @@ TextTooltip.propTypes = {
 };
 
 export default function ParticipationPage() {
-  const [courses, setCourses] = useState([]);
-  const [course, setCourse] = useState("");
+  const { course, setCourse, courses } = useCourse();
 
   const [posts, setPosts] = useState([]);
   const [postsError, setPostsError] = useState(null);
@@ -124,16 +124,6 @@ export default function ParticipationPage() {
   const [committing, setCommitting] = useState(false);
 
   // --- data loading -------------------------------------------------------
-  useEffect(() => {
-    fetch("/api/participation/courses")
-      .then((r) => r.json())
-      .then((data) => {
-        setCourses(data.courses || []);
-        setCourse((prev) => prev || data.courses?.[0] || "");
-      })
-      .catch(() => setCourses([]));
-  }, []);
-
   const refreshPosts = useCallback(() => {
     if (!course) return;
     setLoadingPosts(true);
@@ -375,8 +365,8 @@ export default function ParticipationPage() {
             onChange={(e) => setCourse(e.target.value)}
           >
             {courses.map((c) => (
-              <option key={c} value={c}>
-                {c}
+              <option key={c.key} value={c.key}>
+                {c.key}
               </option>
             ))}
           </select>
