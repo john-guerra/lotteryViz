@@ -4,7 +4,9 @@ import { useCourse } from "../context/CourseContext";
 import StudentTable from "../components/StudentTable";
 import AdminLotteryChart from "../components/AdminLotteryChart";
 import StudentHistoryModal from "../components/StudentHistoryModal";
+import CanvasExportModal from "../components/CanvasExportModal";
 import { classes } from "../students.mjs";
+import { getCanvasConfig } from "../courses.mjs";
 
 function AdminPage() {
   const { course, setCourse, courses } = useCourse();
@@ -15,6 +17,8 @@ function AdminPage() {
   const [studentIdMap, setStudentIdMap] = useState({});
   const [searchName, setSearchName] = useState("");
   const [anonymize, setAnonymize] = useState(true);
+  const [gradeType, setGradeType] = useState("lottery");
+  const [exportOpen, setExportOpen] = useState(false);
 
   const refreshData = useCallback(() => {
     fetch("getCounts/" + course)
@@ -48,6 +52,17 @@ function AdminPage() {
     setStudentIdMap(idMap);
   }, []);
 
+  // Presence of a canvas block is what makes a course exportable. A null
+  // assignment id is NOT disqualifying — the live run finds or creates it.
+  const canvasConfig = getCanvasConfig(course);
+  const assignmentId =
+    gradeType === "lottery"
+      ? canvasConfig?.lotteryAssignmentId
+      : canvasConfig?.accumulatedPointsAssignmentId;
+  const exportTitle = canvasConfig
+    ? `Preview and export ${gradeType} grades to Canvas`
+    : `${course} is not wired for Canvas export`;
+
   return (
     <SelectionProvider>
       <div className="container-fluid d-flex flex-column" style={{ height: "100vh", overflow: "hidden" }}>
@@ -68,6 +83,28 @@ function AdminPage() {
               ))}
             </select>
           </label>
+          <div className="d-flex align-items-center" style={{ gap: "0.5rem" }}>
+            <label className="mb-0">
+              Grade type:{" "}
+              <select
+                className="form-control d-inline-block w-auto"
+                value={gradeType}
+                onChange={(e) => setGradeType(e.target.value)}
+              >
+                <option value="lottery">Lottery</option>
+                <option value="accumulated">Accumulated</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setExportOpen(true)}
+              disabled={!canvasConfig}
+              title={exportTitle}
+            >
+              Export to Canvas
+            </button>
+          </div>
         </div>
 
         <div className="row flex-grow-1" style={{ minHeight: 0 }}>
@@ -122,6 +159,14 @@ function AdminPage() {
           onClose={handleCloseHistory}
           studentName={historyStudent}
           allGrades={allGrades}
+        />
+
+        <CanvasExportModal
+          open={exportOpen}
+          course={course}
+          gradeType={gradeType}
+          assignmentId={assignmentId}
+          onClose={() => setExportOpen(false)}
         />
       </div>
     </SelectionProvider>
