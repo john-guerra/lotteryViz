@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { SelectionProvider } from "../context/SelectionContext";
+import { useCourse } from "../context/CourseContext";
 import StudentTable from "../components/StudentTable";
 import AdminLotteryChart from "../components/AdminLotteryChart";
 import StudentHistoryModal from "../components/StudentHistoryModal";
 import { classes } from "../students.mjs";
 
 function AdminPage() {
-  const [course, setCourse] = useState(Object.keys(classes)[0]);
+  const { course, setCourse, courses } = useCourse();
   const [counts, setCounts] = useState([]);
   const [allGrades, setAllGrades] = useState([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -60,9 +61,9 @@ function AdminPage() {
               value={course}
               onChange={onChangeCourse}
             >
-              {Object.keys(classes).map((c) => (
-                <option value={c} key={c}>
-                  {c}
+              {courses.map((c) => (
+                <option value={c.key} key={c.key}>
+                  {c.key}
                 </option>
               ))}
             </select>
