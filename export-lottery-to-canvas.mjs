@@ -51,6 +51,22 @@ if (fs.existsSync(envPath)) {
 const configPath = path.join(__dirname, "canvas-config.json");
 const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 
+/**
+ * Resolve a course's Canvas wiring. Active courses carry it in students.mjs;
+ * finished semesters keep theirs in canvas-config.json so the CLI can still
+ * re-export them. Normalizes the archived `canvasId` to `courseId`.
+ */
+export function resolveCourseConfig(course, activeMap = classes, archive = config.courses) {
+  const active = activeMap?.[course]?.canvas;
+  if (active) return active;
+
+  const archived = archive?.[course];
+  if (!archived) return null;
+
+  const { canvasId, ...rest } = archived;
+  return { courseId: canvasId, ...rest };
+}
+
 // Log file path
 const logFilePath = path.join(__dirname, "canvas-export-log.txt");
 
@@ -518,15 +534,25 @@ async function processCourse(courseName, options = {}) {
   console.log(`Mode: ${dryRun ? "DRY RUN" : "LIVE"}`);
   console.log(`${"=".repeat(60)}\n`);
 
-  const courseConfig = config.courses[courseName];
+  const courseConfig = resolveCourseConfig(courseName);
   if (!courseConfig) {
     console.error(`Course "${courseName}" not found in config.`);
-    console.log("Available courses:", Object.keys(config.courses).join(", "));
-    return { success: false, error: "Course not found" };
+    console.log(
+      "Available courses:",
+      [
+        ...Object.keys(classes).filter((k) => classes[k].canvas),
+        ...Object.keys(config.courses),
+      ].join(", ")
+    );
+    return { success: false, courseName, error: "Course not found" };
   }
 
-  const { canvasId, lotteryAssignmentId, accumulatedPointsAssignmentId, participationGroupId } =
-    courseConfig;
+  const {
+    courseId: canvasId,
+    lotteryAssignmentId,
+    accumulatedPointsAssignmentId,
+    participationGroupId,
+  } = courseConfig;
 
   // Determine which assignment to use
   let assignmentId;
@@ -535,6 +561,10 @@ async function processCourse(courseName, options = {}) {
   } else if (gradeType === "accumulated") {
     assignmentId = accumulatedPointsAssignmentId;
   }
+
+  // A null assignmentId is not an error: the live run (Step 7) finds or creates
+  // the assignment in Canvas. Dry runs never reach that code, so a preview for
+  // an unconfigured assignment still computes grades correctly.
 
   // Step 1: Get lottery data from MongoDB
   console.log("Fetching lottery data from MongoDB...");
@@ -744,6 +774,12 @@ async function processCourse(courseName, options = {}) {
   console.log(`  Points - Min: ${stats.min}, Max: ${stats.max}, Median: ${medianDisplay}, Mean: ${stats.mean.toFixed(1)}`);
   console.log(`  Calls - Median: ${stats.medianCalls}`);
 
+  // Hoisted above the dry-run branch so they are visible at the return, letting
+  // an HTTP caller report the outcome. A dry run returns zeros and null.
+  let submitted = 0;
+  let errors = 0;
+  let verification = null;
+
   // Step 7: Submit grades to Canvas (if not dry run)
   if (!dryRun) {
     // Fetch assignment groups to get group names for logging
@@ -814,8 +850,6 @@ async function processCourse(courseName, options = {}) {
 
     console.log("\n--- Submitting Grades to Canvas ---\n");
 
-    let submitted = 0;
-    let errors = 0;
     const submittedGrades = [];
 
     for (const student of studentsWithGrades) {
@@ -869,7 +903,7 @@ ${enrichPointHistory(studentEntries, postsByUrl)}`;
     // Step 8: Verify grades
     console.log("\n--- Verifying Grades ---\n");
     try {
-      const verification = await verifyGrades(canvasId, assignmentId, submittedGrades);
+      verification = await verifyGrades(canvasId, assignmentId, submittedGrades);
       console.log(`Verified ${verification.verified}/${verification.total} grades match`);
       logChange(`VERIFICATION: ${courseName} | ${verification.verified}/${verification.total} grades verified`);
 
@@ -896,6 +930,9 @@ ${enrichPointHistory(studentEntries, postsByUrl)}`;
     stats,
     studentsWithGrades,
     unmatchedLottery,
+    submitted,
+    errors,
+    verification,
   };
 }
 
@@ -1016,4 +1053,4 @@ if (process.argv[1] === __filename) {
 }
 
 // Exports for testing
-export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas };
+export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas, processCourse };
