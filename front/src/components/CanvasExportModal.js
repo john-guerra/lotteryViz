@@ -8,11 +8,11 @@ import PropTypes from "prop-types";
 
 const POLL_MS = 1500;
 
-async function startExport({ course, gradeType, dryRun }) {
+async function startExport({ course, dryRun }) {
   const res = await fetch("/api/canvas/export", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ course, gradeType, dryRun }),
+    body: JSON.stringify({ course, dryRun }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `Export failed (${res.status})`);
@@ -22,7 +22,6 @@ async function startExport({ course, gradeType, dryRun }) {
 export default function CanvasExportModal({
   open,
   course,
-  gradeType,
   assignmentId,
   onClose,
 }) {
@@ -43,7 +42,7 @@ export default function CanvasExportModal({
       setPhase(dryRun ? "running" : "committing");
       setError(null);
       try {
-        const jobId = await startExport({ course, gradeType, dryRun });
+        const jobId = await startExport({ course, dryRun });
         pollRef.current = setInterval(async () => {
           const res = await fetch(`/api/canvas/export/${jobId}`);
           const job = await res.json();
@@ -65,7 +64,7 @@ export default function CanvasExportModal({
         setPhase("error");
       }
     },
-    [course, gradeType, stopPolling]
+    [course, stopPolling]
   );
 
   useEffect(() => {
@@ -95,7 +94,7 @@ export default function CanvasExportModal({
         <div className="modal-content">
           <div className="modal-header">
             <h5 className="modal-title">
-              Export to Canvas — {course} ({gradeType})
+              Export to Canvas — {course}
             </h5>
             {!busy && (
               <button type="button" className="close" onClick={onClose}>
@@ -151,7 +150,7 @@ export default function CanvasExportModal({
 
                 {!assignmentId && (
                   <div className="alert alert-info">
-                    No {gradeType} assignment is configured for this course. Submitting
+                    No lottery assignment is configured for this course. Submitting
                     will find or create one in Canvas.
                   </div>
                 )}
@@ -211,7 +210,6 @@ export default function CanvasExportModal({
 CanvasExportModal.propTypes = {
   open: PropTypes.bool.isRequired,
   course: PropTypes.string.isRequired,
-  gradeType: PropTypes.string.isRequired,
   assignmentId: PropTypes.number,
   onClose: PropTypes.func.isRequired,
 };
