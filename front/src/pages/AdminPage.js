@@ -17,7 +17,6 @@ function AdminPage() {
   const [studentIdMap, setStudentIdMap] = useState({});
   const [searchName, setSearchName] = useState("");
   const [anonymize, setAnonymize] = useState(true);
-  const [gradeType, setGradeType] = useState("lottery");
   const [exportOpen, setExportOpen] = useState(false);
 
   const refreshData = useCallback(() => {
@@ -55,12 +54,9 @@ function AdminPage() {
   // Presence of a canvas block is what makes a course exportable. A null
   // assignment id is NOT disqualifying — the live run finds or creates it.
   const canvasConfig = getCanvasConfig(course);
-  const assignmentId =
-    gradeType === "lottery"
-      ? canvasConfig?.lotteryAssignmentId
-      : canvasConfig?.accumulatedPointsAssignmentId;
+  const assignmentId = canvasConfig?.lotteryAssignmentId;
   const exportTitle = canvasConfig
-    ? `Preview and export ${gradeType} grades to Canvas`
+    ? "Preview and export lottery grades to Canvas"
     : `${course} is not wired for Canvas export`;
 
   return (
@@ -84,17 +80,6 @@ function AdminPage() {
             </select>
           </label>
           <div className="d-flex align-items-center" style={{ gap: "0.5rem" }}>
-            <label className="mb-0">
-              Grade type:{" "}
-              <select
-                className="form-control d-inline-block w-auto"
-                value={gradeType}
-                onChange={(e) => setGradeType(e.target.value)}
-              >
-                <option value="lottery">Lottery</option>
-                <option value="accumulated">Accumulated</option>
-              </select>
-            </label>
             <button
               type="button"
               className="btn btn-primary"
@@ -164,7 +149,6 @@ function AdminPage() {
         <CanvasExportModal
           open={exportOpen}
           course={course}
-          gradeType={gradeType}
           assignmentId={assignmentId}
           onClose={() => setExportOpen(false)}
         />
