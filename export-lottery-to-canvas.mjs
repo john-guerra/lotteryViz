@@ -1053,4 +1053,4 @@ if (process.argv[1] === __filename) {
 }
 
 // Exports for testing
-export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas, processCourse };
+export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas, processCourse, computeGrade };
