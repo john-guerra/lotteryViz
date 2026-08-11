@@ -27,9 +27,8 @@ describe("computeGrade", () => {
   });
 
   test("above the median rises linearly toward 110", () => {
-    const grade = computeGrade(16, POINTS, stats);
-    expect(grade).toBeGreaterThan(100);
-    expect(grade).toBeLessThan(110);
+    // 8 of the other 10 points are below 16 -> percentile 80 -> grade 106 exactly.
+    expect(computeGrade(16, POINTS, stats)).toBe(106);
   });
 
   test("one standard deviation below the median lands near 78", () => {
@@ -50,11 +49,19 @@ describe("computeGrade", () => {
     expect(computeGrade(5, [5], { median: 5, stdDev: 0 })).toBe(100);
   });
 
-  test("uses the upper-middle element as median, not the average of two", () => {
-    // Even-length: d3.median would say 5, this code says 6 (index 2).
-    const even = [2, 4, 6, 8];
-    const evenStats = statsFor(even);
-    expect(evenStats.median).toBe(6);
-    expect(computeGrade(6, even, evenStats)).toBe(100);
+  test("a student at the raw median scores above 100 once a median adjustment shifts the distribution", () => {
+    // Mirrors export-lottery-to-canvas.mjs:656-689: the whole distribution is shifted
+    // by medianAdjustment before grading (allPointsSorted.map(p => p - medianAdjustment)),
+    // but each student is graded on their RAW points against that shifted distribution.
+    // A student sitting at the raw (unadjusted) median therefore lands above the
+    // adjusted median and must score above 100.
+    const medianAdjustment = 2;
+    const adjustedPointsSorted = POINTS.map((p) => p - medianAdjustment);
+    const adjustedStats = statsFor(adjustedPointsSorted);
+
+    const grade = computeGrade(MEDIAN, adjustedPointsSorted, adjustedStats);
+
+    expect(grade).toBeGreaterThan(100);
+    expect(grade).toBe(102);
   });
 });
