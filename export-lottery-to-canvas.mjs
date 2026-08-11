@@ -527,7 +527,7 @@ async function verifyGrades(courseId, assignmentId, expectedGrades) {
  * Process a single course
  */
 async function processCourse(courseName, options = {}) {
-  const { dryRun = false, verbose = false, gradeType = "lottery" } = options;
+  const { dryRun = false, verbose = false } = options;
 
   console.log(`\n${"=".repeat(60)}`);
   console.log(`Processing course: ${courseName}`);
@@ -550,17 +550,11 @@ async function processCourse(courseName, options = {}) {
   const {
     courseId: canvasId,
     lotteryAssignmentId,
-    accumulatedPointsAssignmentId,
     participationGroupId,
   } = courseConfig;
 
   // Determine which assignment to use
-  let assignmentId;
-  if (gradeType === "lottery") {
-    assignmentId = lotteryAssignmentId;
-  } else if (gradeType === "accumulated") {
-    assignmentId = accumulatedPointsAssignmentId;
-  }
+  let assignmentId = lotteryAssignmentId;
 
   // A null assignmentId is not an error: the live run (Step 7) finds or creates
   // the assignment in Canvas. Dry runs never reach that code, so a preview for
@@ -801,7 +795,7 @@ async function processCourse(courseName, options = {}) {
 
     if (!assignmentId) {
       console.log("\n--- Checking for Existing Assignment ---");
-      assignmentName = gradeType === "accumulated" ? "Lottery Accumulated Points" : "Lottery Grade";
+      assignmentName = "Lottery Grade";
       try {
         // Check for existing assignment first
         const existing = await findExistingAssignment(canvasId, assignmentName);
@@ -823,7 +817,7 @@ async function processCourse(courseName, options = {}) {
           console.log(`  Created assignment ID: ${assignmentId}`);
           console.log(`  Assignment group: ${assignmentGroupName}`);
           console.log(
-            `  Update canvas-config.json with: "${gradeType === "accumulated" ? "accumulatedPointsAssignmentId" : "lotteryAssignmentId"}": ${assignmentId}`
+            `  Update canvas-config.json with: "lotteryAssignmentId": ${assignmentId}`
           );
           logChange(`ASSIGNMENT CREATED: "${assignmentName}" (ID: ${assignmentId}) in group "${assignmentGroupName}"`);
         }
@@ -939,14 +933,13 @@ ${enrichPointHistory(studentEntries, postsByUrl)}`;
 /**
  * Parse command line arguments
  */
-function parseArgs() {
-  const args = process.argv.slice(2);
+function parseArgs(argv = process.argv.slice(2)) {
+  const args = argv;
   const options = {
     courses: [],
     dryRun: false,
     all: false,
     verbose: false,
-    gradeType: "lottery",
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -961,7 +954,14 @@ function parseArgs() {
     } else if (arg === "--verbose" || arg === "-v") {
       options.verbose = true;
     } else if (arg === "--grade-type" || arg === "-g") {
-      options.gradeType = args[++i];
+      // Removed deliberately: this flag only ever chose the destination
+      // assignment, never the submitted value, so "accumulated" posted the
+      // curved grade to a column named for a raw tally. Fail loudly rather
+      // than silently ignoring a flag someone's muscle memory still types.
+      throw new Error(
+        "--grade-type has been removed. Exports always submit the lottery grade; " +
+          "the raw point total and class median are in the Canvas comment."
+      );
     } else if (arg === "--help" || arg === "-h") {
       console.log(`
 Usage: node export-lottery-to-canvas.mjs [options]
@@ -971,13 +971,12 @@ Options:
   --all, -a              Process all courses
   --dry-run, -d          Preview grades without submitting to Canvas
   --verbose, -v          Show detailed output for each submission
-  --grade-type, -g       Type of grade: 'lottery' (default) or 'accumulated'
   --help, -h             Show this help message
 
 Examples:
-  npm run export_to_canvas -- --course db_spring_2026 --dry-run
+  npm run export_to_canvas -- --course my_course --dry-run
   npm run export_to_canvas -- --all
-  npm run export_to_canvas -- -c aicoding_spring_2026 -v
+  npm run export_to_canvas -- -c my_course -v
 `);
       process.exit(0);
     }
@@ -1021,7 +1020,6 @@ async function main() {
       const result = await processCourse(course, {
         dryRun: options.dryRun,
         verbose: options.verbose,
-        gradeType: options.gradeType,
       });
       results.push(result);
     } catch (error) {
@@ -1049,8 +1047,11 @@ async function main() {
 // Run CLI only when executed directly, not when imported for testing
 const __filename = fileURLToPath(import.meta.url);
 if (process.argv[1] === __filename) {
-  main();
+  main().catch((error) => {
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  });
 }
 
 // Exports for testing
-export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas, processCourse, computeGrade };
+export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas, processCourse, computeGrade, parseArgs };
