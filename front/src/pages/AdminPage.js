@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { SelectionProvider } from "../context/SelectionContext";
 import { useCourse } from "../context/CourseContext";
 import StudentTable from "../components/StudentTable";
@@ -7,6 +7,11 @@ import StudentHistoryModal from "../components/StudentHistoryModal";
 import CanvasExportModal from "../components/CanvasExportModal";
 import { classes } from "../students.mjs";
 import { getCanvasConfig } from "../courses.mjs";
+import { runExportJob } from "../canvasExportJob.mjs";
+
+// Stable identity so the prop does not change on every render and defeat
+// StudentTable's useMemo dependencies.
+const EMPTY_SET = new Set();
 
 function AdminPage() {
   const { course, setCourse, courses } = useCourse();
@@ -18,20 +23,41 @@ function AdminPage() {
   const [searchName, setSearchName] = useState("");
   const [anonymize, setAnonymize] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
+  const [canvasGrades, setCanvasGrades] = useState(null); // { byName, unmatched, loadedAt }
+  const [gradesStatus, setGradesStatus] = useState("idle"); // idle|loading|ready|error
+  const [gradesError, setGradesError] = useState(null);
+  const gradeJobRef = useRef(null);
 
   const refreshData = useCallback(() => {
-    fetch("getCounts/" + course)
+    const counts = fetch("getCounts/" + course)
       .then((res) => res.json())
       .then((_counts) => setCounts(_counts));
 
-    fetch("getAllGrades/" + course)
+    const grades = fetch("getAllGrades/" + course)
       .then((res) => res.json())
-      .then((grades) => setAllGrades(grades));
+      .then((_grades) => setAllGrades(_grades));
+
+    return Promise.all([counts, grades]);
   }, [course]);
 
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  // Grades belong to the course they were computed for. Cancel any in-flight
+  // job too, so a slow response for the previous course cannot land on the new
+  // one and quietly mislabel every row.
+  useEffect(() => {
+    setCanvasGrades(null);
+    setGradesStatus("idle");
+    setGradesError(null);
+    return () => {
+      if (gradeJobRef.current) {
+        gradeJobRef.current.cancel();
+        gradeJobRef.current = null;
+      }
+    };
+  }, [course]);
 
   const onChangeCourse = (evt) => {
     setCourse(evt.target.value);
@@ -50,6 +76,44 @@ function AdminPage() {
   const handleStudentIdMapReady = useCallback((idMap) => {
     setStudentIdMap(idMap);
   }, []);
+
+  const handleLoadGrades = useCallback(async () => {
+    setGradesStatus("loading");
+    setGradesError(null);
+
+    // Refresh the table first. refreshData reads Mongo at page load; the dry
+    // run re-reads it server-side at click time. Without this, Grade would be
+    // computed from a newer dataset than every other column — a row could read
+    // "Points: 12" beside a grade computed from 14.
+    try {
+      await refreshData();
+    } catch {
+      // A failed refresh is not fatal — the grades are still worth loading,
+      // and the stale-Points risk is what the caption's timestamp is for.
+    }
+
+    const job = runExportJob({ course, dryRun: true });
+    gradeJobRef.current = job;
+
+    try {
+      const result = await job.promise;
+      gradeJobRef.current = null;
+      setCanvasGrades({
+        byName: Object.fromEntries(
+          (result.studentsWithGrades || [])
+            .filter((s) => s.lotteryName)
+            .map((s) => [s.lotteryName, s.grade])
+        ),
+        unmatched: new Set((result.unmatchedLottery || []).map((u) => u.name)),
+        loadedAt: new Date(),
+      });
+      setGradesStatus("ready");
+    } catch (err) {
+      gradeJobRef.current = null;
+      setGradesError(err.message);
+      setGradesStatus("error");
+    }
+  }, [course, refreshData]);
 
   // Presence of a canvas block is what makes a course exportable. A null
   // assignment id is NOT disqualifying — the live run finds or creates it.
@@ -80,6 +144,19 @@ function AdminPage() {
             </select>
           </label>
           <div className="d-flex align-items-center" style={{ gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              onClick={handleLoadGrades}
+              disabled={!canvasConfig || gradesStatus === "loading"}
+              title={
+                canvasConfig
+                  ? "Fetch the grades Canvas would receive"
+                  : `${course} is not wired for Canvas export`
+              }
+            >
+              {gradesStatus === "loading" ? "Loading grades…" : "Load Canvas grades"}
+            </button>
             <button
               type="button"
               className="btn btn-primary"
@@ -123,7 +200,38 @@ function AdminPage() {
               studentIdMap={studentIdMap}
               anonymize={anonymize}
               searchFilter={searchName}
+              canvasGrades={canvasGrades?.byName ?? null}
+              unmatchedNames={canvasGrades?.unmatched ?? EMPTY_SET}
+              gradesStatus={gradesStatus}
             />
+            {gradesStatus === "ready" && (
+              <small className="text-muted mt-1">
+                Canvas grades loaded{" "}
+                {canvasGrades.loadedAt.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm p-0 align-baseline"
+                  onClick={handleLoadGrades}
+                >
+                  Reload
+                </button>
+              </small>
+            )}
+            {gradesStatus === "error" && (
+              <small className="text-danger mt-1">
+                {gradesError}{" "}
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm p-0 align-baseline"
+                  onClick={handleLoadGrades}
+                >
+                  Retry
+                </button>
+              </small>
+            )}
           </div>
           <div className="col-md-7 d-flex flex-column" style={{ minHeight: 0 }}>
             <div className="d-flex align-items-center justify-content-between mb-2" style={{ flexShrink: 0 }}>
