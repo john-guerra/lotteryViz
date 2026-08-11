@@ -20,7 +20,7 @@ function isLocalhost(req) {
 }
 
 router.post("/export", (req, res) => {
-  const { course, gradeType = "lottery", dryRun = true } = req.body || {};
+  const { course, dryRun = true } = req.body || {};
   if (!course) return res.status(400).json({ error: "course is required" });
 
   const courseConfig = resolveCourseConfig(course);
@@ -41,9 +41,9 @@ router.post("/export", (req, res) => {
 
   // Dry and live runs are separate jobs for the same course, so key them apart —
   // otherwise a confirm would be deduped into the preview that is still running.
-  const key = `${course}:${gradeType}:${dryRun ? "dry" : "live"}`;
+  const key = `${course}:${dryRun ? "dry" : "live"}`;
   const { jobId, reused } = jobs.start(key, () =>
-    processCourse(course, { dryRun, gradeType, verbose: false })
+    processCourse(course, { dryRun, verbose: false })
   );
 
   res.json(reused ? { jobId, reused } : { jobId });
