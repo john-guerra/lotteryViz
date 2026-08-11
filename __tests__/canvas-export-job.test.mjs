@@ -123,6 +123,12 @@ describe("runExportJob", () => {
     await new Promise((r) => setTimeout(r, 20));
     cancel();
     const after = fetchImpl.calls.length;
+    // Call 0 is the POST to start the job; anything beyond that must be a
+    // poll GET. Without this, a module that never polls at all (e.g. hangs
+    // forever after the POST) would satisfy "stops growing after cancel"
+    // just as well as one that polled and then stopped.
+    expect(after).toBeGreaterThan(1);
+    expect(fetchImpl.calls[1].url).toBe("/api/canvas/export/1");
     await new Promise((r) => setTimeout(r, 30));
     expect(fetchImpl.calls.length).toBe(after);
   });
