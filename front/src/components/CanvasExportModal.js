@@ -1,23 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
+import { runExportJob } from "../canvasExportJob.mjs";
 
 // Preview-before-write modal for Canvas grade export. Opens on a dry run,
 // renders the computed grades, and only writes when the instructor confirms.
 // The confirm re-runs the export live rather than replaying the preview, so a
 // stale preview can never submit old grades.
-
-const POLL_MS = 1500;
-
-async function startExport({ course, dryRun }) {
-  const res = await fetch("/api/canvas/export", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ course, dryRun }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Export failed (${res.status})`);
-  return data.jobId;
-}
 
 export default function CanvasExportModal({
   open,
@@ -28,43 +16,37 @@ export default function CanvasExportModal({
   const [phase, setPhase] = useState("running"); // running|preview|committing|done|error
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const pollRef = useRef(null);
+  const jobRef = useRef(null);
 
   const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
+    if (jobRef.current) {
+      jobRef.current.cancel();
+      jobRef.current = null;
     }
   }, []);
 
   const run = useCallback(
-    async (dryRun) => {
+    (dryRun) => {
       setPhase(dryRun ? "running" : "committing");
       setError(null);
-      try {
-        const jobId = await startExport({ course, dryRun });
-        pollRef.current = setInterval(async () => {
-          const res = await fetch(`/api/canvas/export/${jobId}`);
-          const job = await res.json();
-          if (job.status === "running") return;
-          stopPolling();
-          if (job.status === "error") {
-            setError(job.error);
-            setPhase("error");
-          } else if (job.result?.success === false) {
-            setError(job.result.error || "Export failed.");
-            setPhase("error");
-          } else {
-            setResult(job.result);
-            setPhase(dryRun ? "preview" : "done");
-          }
-        }, POLL_MS);
-      } catch (err) {
-        setError(err.message);
-        setPhase("error");
-      }
+
+      const job = runExportJob({ course, dryRun });
+      jobRef.current = job;
+
+      job.promise.then(
+        (jobResult) => {
+          jobRef.current = null;
+          setResult(jobResult);
+          setPhase(dryRun ? "preview" : "done");
+        },
+        (err) => {
+          jobRef.current = null;
+          setError(err.message);
+          setPhase("error");
+        }
+      );
     },
-    [course, stopPolling]
+    [course]
   );
 
   useEffect(() => {
