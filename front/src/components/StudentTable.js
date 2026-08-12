@@ -232,7 +232,14 @@ function StudentTable({
   const renderGrade = (student) => {
     if (gradesStatus === "loading") return <span style={{ color: "#999" }}>·</span>;
     if (student.grade != null) return student.grade;
-    if (gradesStatus === "ready" && unmatchedNames.has(student.name)) {
+    // Not gated on "ready" alone: a failed reload keeps the last good
+    // canvasGrades/unmatchedNames on screen (see AdminPage's handleLoadGrades),
+    // so a student unmatched at load time must keep showing the warning
+    // rather than silently reverting to a dash that reads as "no grade
+    // needed". "idle" is excluded because a course switch resets
+    // unmatchedNames to empty anyway, so this only differs from "ready" by
+    // also covering "error".
+    if (gradesStatus !== "idle" && unmatchedNames.has(student.name)) {
       return (
         <span
           style={{ color: "#fd7e14" }}
@@ -315,7 +322,7 @@ function StudentTable({
                   {student.points}
                 </td>
                 <td>{student.callsPerClass}</td>
-                <td style={{ backgroundColor: getGradeColor(student.grade) }}>
+                <td style={{ backgroundColor: getGradeColor(gradesStatus === "loading" ? null : student.grade) }}>
                   {renderGrade(student)}
                 </td>
                 <td>{renderLast10(student.last10)}</td>
