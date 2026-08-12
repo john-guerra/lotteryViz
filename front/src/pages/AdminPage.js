@@ -209,7 +209,12 @@ function AdminPage() {
               unmatchedNames={canvasGrades?.unmatched ?? EMPTY_SET}
               gradesStatus={gradesStatus}
             />
-            {gradesStatus === "ready" && (
+            {/* Gated on canvasGrades, not gradesStatus: a failed reload does
+                not clear the last good grades (see handleLoadGrades), so the
+                timestamp that dates them must stay visible too — otherwise
+                the table would show fresh Points beside old grades with
+                nothing on screen saying they are stale. */}
+            {canvasGrades != null && (
               <small className="text-muted mt-1">
                 Canvas grades loaded{" "}
                 {canvasGrades.loadedAt.toLocaleTimeString([], {
@@ -226,7 +231,7 @@ function AdminPage() {
               </small>
             )}
             {gradesStatus === "error" && (
-              <small className="text-danger mt-1">
+              <small className="text-danger mt-1 d-block">
                 {gradesError}{" "}
                 <button
                   type="button"
