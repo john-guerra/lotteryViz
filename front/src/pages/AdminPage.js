@@ -97,6 +97,10 @@ function AdminPage() {
 
     try {
       const result = await job.promise;
+      // Bail out if a newer invocation (or a course-change cancel) has
+      // already replaced/cleared the ref — this job is stale and must not
+      // touch state or null out someone else's ref.
+      if (gradeJobRef.current !== job) return;
       gradeJobRef.current = null;
       setCanvasGrades({
         byName: Object.fromEntries(
@@ -109,6 +113,7 @@ function AdminPage() {
       });
       setGradesStatus("ready");
     } catch (err) {
+      if (gradeJobRef.current !== job) return;
       gradeJobRef.current = null;
       setGradesError(err.message);
       setGradesStatus("error");
