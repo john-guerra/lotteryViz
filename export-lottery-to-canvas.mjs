@@ -4,8 +4,8 @@
  * Export lottery participation grades to Canvas
  *
  * Usage:
- *   npm run export_to_canvas -- --course aicoding_spring_2026 --dry-run
- *   npm run export_to_canvas -- --course db_spring_2026
+ *   npm run export_to_canvas -- --course my_course --dry-run
+ *   npm run export_to_canvas -- --course my_course
  *   npm run export_to_canvas -- --all
  */
 
