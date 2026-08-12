@@ -6,6 +6,8 @@ import logger from "morgan";
 // import cors from "cors";
 
 import indexRouter from "./routes/index.js";
+import participationRouter from "./routes/participation.js";
+import canvasRouter from "./routes/canvas.js";
 
 import { URL } from "url";
 
@@ -23,6 +25,8 @@ app.use(express.static(path.join(__dirname, "front/build")));
 // app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/", indexRouter);
+app.use("/api/participation", participationRouter);
+app.use("/api/canvas", canvasRouter);
 
 // SPA catch-all: serve index.html for any route not handled by API
 app.get("*", (req, res) => {

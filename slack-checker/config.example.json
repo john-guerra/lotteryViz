@@ -1,0 +1,12 @@
+{
+  "<course_key>": {
+    "channels": ["#general", "#announcements", "#classchat"],
+    "semesterStart": "2026-05-04",
+    "semesterEnd": "2026-08-21",
+    "instructorSlackId": "U0000000000",
+    "seedOfferPhrases": [
+      "I'll give participation points to everyone who responds in this thread",
+      "Lottery points if you reply here before tomorrow"
+    ]
+  }
+}
