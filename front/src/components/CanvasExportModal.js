@@ -7,6 +7,14 @@ import { runExportJob } from "../canvasExportJob.mjs";
 // The confirm re-runs the export live rather than replaying the preview, so a
 // stale preview can never submit old grades.
 
+// The dry run is a read-only preview; 2 minutes is generous for that. The
+// live commit is a sequential per-student loop of Canvas PUTs plus paginated
+// enrollment fetches and a verification pass — at ~1.5s/student a 60-student
+// class alone exceeds 2 minutes. Give it 15 minutes so the client doesn't
+// give up on a submission that is still succeeding server-side.
+const DRY_RUN_DEADLINE_MS = 120000;
+const LIVE_DEADLINE_MS = 900000;
+
 export default function CanvasExportModal({
   open,
   course,
@@ -30,7 +38,11 @@ export default function CanvasExportModal({
       setPhase(dryRun ? "running" : "committing");
       setError(null);
 
-      const job = runExportJob({ course, dryRun });
+      const job = runExportJob({
+        course,
+        dryRun,
+        deadlineMs: dryRun ? DRY_RUN_DEADLINE_MS : LIVE_DEADLINE_MS,
+      });
       jobRef.current = job;
 
       job.promise.then(
