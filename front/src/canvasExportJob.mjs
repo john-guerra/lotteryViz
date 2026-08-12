@@ -70,7 +70,10 @@ export function runExportJob({
 
         if (job.status === "running") {
           if (Date.now() > deadline) {
-            throw new Error("Canvas export timed out. Try again.");
+            throw new Error(
+              "Timed out waiting for the Canvas export to finish — it may " +
+                "still be running on the server. Check back before retrying."
+            );
           }
           continue;
         }
