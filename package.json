@@ -16,6 +16,7 @@
     "check-slack": "node slack-checker/check-responses.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@observablehq/runtime": "5",
     "@slack/web-api": "^7.13.0",
     "cookie-parser": "~1.4.4",

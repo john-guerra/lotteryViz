@@ -5,6 +5,7 @@ import * as d3 from "d3";
 import LotteryResultsFromMongo from "../LotteryResultsFromMongo";
 import { calculateMedian } from "../LotteryChart";
 import { classes } from "../students.mjs";
+import { useCourse } from "../context/CourseContext";
 
 function toLocaleIsoString(date) {
   const localDate = new Date(date - date.getTimezoneOffset() * 60000);
@@ -14,8 +15,9 @@ function toLocaleIsoString(date) {
 }
 
 const MainPage = () => {
-  const [course, setCourse] = useState(Object.keys(classes)[0]);
-  const [options, setOptions] = useState(classes[course].roster);
+  const { course, setCourse, courses } = useCourse();
+  // Derived rather than a second state kept in sync by hand.
+  const options = classes[course].roster;
   const [dayGrades, setDayGrades] = useState([]);
   const [useCustomDate, setUseCustomDate] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -148,9 +150,7 @@ const MainPage = () => {
   useEffect(refreshGrades, [course, selectedDate, useCustomDate]);
 
   const onChangeCourse = (evt) => {
-    console.log("course", evt.target.value);
     setCourse(evt.target.value);
-    setOptions(classes[evt.target.value].roster);
   };
 
   const renderCourseSelector = () => {
@@ -158,10 +158,15 @@ const MainPage = () => {
       <div className="mb-3">
         <label>
           Course:{" "}
-          <select className="form-control" name="course" onChange={onChangeCourse}>
-            {Object.keys(classes).map((c) => (
-              <option value={c} key={c}>
-                {c}
+          <select
+            className="form-control"
+            name="course"
+            value={course}
+            onChange={onChangeCourse}
+          >
+            {courses.map((c) => (
+              <option value={c.key} key={c.key}>
+                {c.key}
               </option>
             ))}
           </select>

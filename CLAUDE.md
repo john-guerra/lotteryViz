@@ -38,9 +38,19 @@ This is preferred over running the frontend dev server because:
 - `front/src/LotteryChart.js` - Local D3 visualization component (replaces Observable notebook)
 - `front/src/LotteryResultsFromMongo.js` - Wrapper component for the chart
 - `front/src/App.js` - Main application component
-- `front/src/students.mjs` - Course and student configuration (gitignored for privacy)
+- `front/src/students.mjs` - Course and student configuration (gitignored for privacy). Data only — no logic, since it is not version-controlled
+- `front/src/courses.mjs` - Course registry derived from students.mjs (tracked). Must not import files outside `front/src/`
 - `db/backup.mjs` - Database backup script
 
 ## Browser Testing
 
-Use Playwright MCP (not Claude in Chrome) for automated browser testing of this project. Playwright provides more reliable browser automation for testing the visualization and UI.
+Use Claude in Chrome (`mcp__claude-in-chrome__*`) to validate UI changes when it is
+available. It runs in the real browser session, so it exercises the app the way it is
+actually used.
+
+Fall back to Playwright MCP when Claude in Chrome is unavailable or the task needs
+scripted, repeatable automation — for example asserting on `localStorage`, driving the
+same flow many times, or running without a visible browser.
+
+Either way, validate against the backend at `http://localhost:4001` after
+`cd front && yarn build` rather than the frontend dev server.

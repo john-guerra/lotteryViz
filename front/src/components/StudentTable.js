@@ -24,7 +24,27 @@ const compactTableStyles = `
 }
 `;
 
-function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymize = false, searchFilter = "" }) {
+// Grades run roughly -100..110 with 100 as the median. Deriving the extent from
+// the data would normalize the entire below-median range across [min, 100],
+// which paints a student at 78 — a full SD below, a real penalty — essentially
+// white, while squeezing everyone above the median into 100..110 and giving
+// them the whole blue half. A fixed, clamped domain keeps the tint honest.
+const GRADE_EXTENT = [60, 110];
+const GRADE_CENTER = 100;
+
+const EMPTY_SET = new Set();
+
+function StudentTable({
+  counts,
+  allGrades,
+  onShowHistory,
+  studentIdMap,
+  anonymize = false,
+  searchFilter = "",
+  canvasGrades = null,
+  unmatchedNames = EMPTY_SET,
+  gradesStatus = "idle",
+}) {
   const { selectedStudents, highlightedStudent, toggleStudent, setHighlightedStudent } = useSelection();
   const [sortColumn, setSortColumn] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
@@ -69,11 +89,12 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
         points: points,
         callsPerClass: calls > 0 ? (points / calls).toFixed(2) : "0.00",
         last10: last10,
+        grade: canvasGrades?.[name] ?? null,
       };
     });
 
     return data;
-  }, [counts, studentIdMap, last10ByStudent]);
+  }, [counts, studentIdMap, last10ByStudent, canvasGrades]);
 
   // Calculate medians for color coding
   const { medianCalls, medianPoints, callsExtent, pointsExtent } = useMemo(() => {
@@ -110,9 +131,35 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
     return color.replace("rgb", "rgba").replace(")", ", 0.3)");
   };
 
+  // Clamp into the fixed domain first: a grade of -100 and one of 60 should
+  // both read as "as red as it gets" rather than rescaling everyone else.
+  const getGradeColor = (grade) => {
+    if (grade == null) return "transparent";
+    const clamped = Math.max(GRADE_EXTENT[0], Math.min(GRADE_EXTENT[1], grade));
+    return getCellColor(clamped, GRADE_CENTER, GRADE_EXTENT);
+  };
+
   const sortedData = useMemo(() => {
     const sorted = [...studentData];
+
     sorted.sort((a, b) => {
+      if (sortColumn === "grade") {
+        // Rank is applied OUTSIDE the direction flip so ungraded rows stay last
+        // in both directions — inside the comparator below, which negates the
+        // whole result, they would jump to the top when descending.
+        const rank = (s) => (s.grade == null ? 1 : 0);
+        const rankDiff = rank(a) - rank(b);
+        if (rankDiff !== 0) return rankDiff;
+
+        if (a.grade !== b.grade) {
+          return sortDirection === "asc" ? a.grade - b.grade : b.grade - a.grade;
+        }
+        // Ties are the common case, not an edge case: every student at the
+        // class median scores exactly 100. Break by points, then name.
+        if (a.points !== b.points) return b.points - a.points;
+        return a.name.localeCompare(b.name);
+      }
+
       let aVal = a[sortColumn];
       let bVal = b[sortColumn];
 
@@ -182,6 +229,29 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
     );
   };
 
+  const renderGrade = (student) => {
+    if (gradesStatus === "loading") return <span style={{ color: "#999" }}>·</span>;
+    if (student.grade != null) return student.grade;
+    // Not gated on "ready" alone: a failed reload keeps the last good
+    // canvasGrades/unmatchedNames on screen (see AdminPage's handleLoadGrades),
+    // so a student unmatched at load time must keep showing the warning
+    // rather than silently reverting to a dash that reads as "no grade
+    // needed". "idle" is excluded because a course switch resets
+    // unmatchedNames to empty anyway, so this only differs from "ready" by
+    // also covering "error".
+    if (gradesStatus !== "idle" && unmatchedNames.has(student.name)) {
+      return (
+        <span
+          style={{ color: "#fd7e14" }}
+          title="No Canvas match — will not be graded"
+        >
+          {"⚠"}
+        </span>
+      );
+    }
+    return <span style={{ color: "#999" }}>{"–"}</span>;
+  };
+
   const getRowClassName = (student) => {
     const classes = [];
     if (student.id && selectedStudents.includes(student.id)) {
@@ -224,6 +294,12 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
               >
                 Pts/Call{getSortIndicator("callsPerClass")}
               </th>
+              <th
+                style={{ cursor: "pointer" }}
+                onClick={() => handleSort("grade")}
+              >
+                Grade{getSortIndicator("grade")}
+              </th>
               <th>Last 10</th>
               <th style={{ width: "60px" }}></th>
             </tr>
@@ -246,6 +322,9 @@ function StudentTable({ counts, allGrades, onShowHistory, studentIdMap, anonymiz
                   {student.points}
                 </td>
                 <td>{student.callsPerClass}</td>
+                <td style={{ backgroundColor: getGradeColor(gradesStatus === "loading" ? null : student.grade) }}>
+                  {renderGrade(student)}
+                </td>
                 <td>{renderLast10(student.last10)}</td>
                 <td>
                   <button
@@ -274,6 +353,9 @@ StudentTable.propTypes = {
   studentIdMap: PropTypes.object,
   anonymize: PropTypes.bool,
   searchFilter: PropTypes.string,
+  canvasGrades: PropTypes.object,
+  unmatchedNames: PropTypes.instanceOf(Set),
+  gradesStatus: PropTypes.oneOf(["idle", "loading", "ready", "error"]),
 };
 
 export default StudentTable;

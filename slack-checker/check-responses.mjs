@@ -4,7 +4,6 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { createInterface } from "readline";
-import mongodb from "mongodb";
 
 // Load .env file
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -26,11 +25,12 @@ try {
 }
 
 // Import after loading env
-const { parseSlackUrl, getThreadReplies, getParentMessage, getUserDisplayNames } = await import("./slack-api.mjs");
+const { parseSlackUrl, getThreadReplies, getParentMessage, getUserDisplayNames, listChannels, getChannelHistory, getPermalink } = await import("./slack-api.mjs");
 import { loadStudentRoster, matchNames, getAvailableCourses } from "./matcher.mjs";
-
-const { MongoClient } = mongodb;
-const mongoUrl = process.env.MONGO_URL || "mongodb://localhost:27017";
+import { recordPost, markAwarded, isAwarded, getPosts } from "./ledger.mjs";
+import { scanOffers } from "./scan.mjs";
+// Shared with the HTTP API so the award math + grade insert never drift.
+import { awardPoints, computeCutoffTs, filterRepliesWithinWindow } from "./award-service.mjs";
 
 const DEFAULT_HOURS = 24;
 
@@ -80,34 +80,94 @@ async function confirm(message) {
   });
 }
 
-/**
- * Award points to a student using direct MongoDB insert
- */
-async function awardPoints(studentName, course, points, reason, postDate) {
-  const dbName = "lottery_" + course;
-  const client = new MongoClient(mongoUrl, { useUnifiedTopology: true });
-
-  try {
-    await client.connect();
-    const grades = client.db(dbName).collection("grades");
-
-    const date = postDate.toDateString();
-
-    await grades.insertOne({
-      date,
-      timestamp: postDate,
-      name: studentName,
-      grade: points,
-      course,
-      reason,
+/** Prompt for a line of input, returning the trimmed answer (or fallback). */
+async function ask(message, fallback = "") {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(message, (answer) => {
+      rl.close();
+      const trimmed = (answer || "").trim();
+      resolve(trimmed === "" ? fallback : trimmed);
     });
+  });
+}
 
-    return true;
+/** Show a numbered course list and return the chosen course key (or null). */
+async function pickCourse() {
+  const courses = getAvailableCourses();
+  console.log("\nCourses:");
+  courses.forEach((c, i) => console.log(`  ${i + 1}) ${c}`));
+  const choice = await ask("Pick a course (number): ");
+  const idx = parseInt(choice, 10) - 1;
+  return courses[idx] || null;
+}
+
+/** Menu action: award points from a thread URL (prompts for missing values). */
+async function menuAwardFromUrl() {
+  const threadUrl = await ask("Slack thread URL: ");
+  if (!threadUrl) return console.log("No URL given.");
+  const course = await pickCourse();
+  if (!course) return console.log("No course selected.");
+  const points = parseInt(await ask("Points per responder [2]: ", "2"), 10);
+  if (isNaN(points) || points < 1) return console.log("Invalid points — must be a positive integer.");
+  const hours = parseFloat(await ask(`Time window in hours [${DEFAULT_HOURS}]: `, String(DEFAULT_HOURS)));
+  if (isNaN(hours) || hours <= 0) return console.log("Invalid hours — must be a positive number.");
+  const topUp = (await ask("Top-up new responders only if already awarded? (y/N): ", "n"))
+    .toLowerCase()
+    .startsWith("y");
+  await awardFromThread({ threadUrl, course, points, hours, dryRun: false, skipConfirm: false, topUp });
+}
+
+/** Menu action: record a post by URL so its text seeds the scanner; optional award. */
+async function menuAddByUrl() {
+  const threadUrl = await ask("Slack thread URL to add: ");
+  if (!threadUrl) return console.log("No URL given.");
+  const course = await pickCourse();
+  if (!course) return console.log("No course selected.");
+  let parsed;
+  try {
+    parsed = parseSlackUrl(threadUrl);
   } catch (error) {
-    console.error(`Error awarding points to ${studentName}:`, error.message);
-    return false;
-  } finally {
-    await client.close();
+    return console.error(error.message);
+  }
+  const parent = await getParentMessage(parsed.channelId, parsed.messageTs);
+  await recordPost(course, {
+    threadTs: parsed.messageTs,
+    url: threadUrl,
+    channel: parsed.channelId,
+    text: parent.text || "",
+    source: "manual",
+    awarded: false,
+  });
+  console.log(`\nRecorded as a reference example:\n  "${(parent.text || "").slice(0, 80)}"`);
+  const alsoAward = (await ask("Award points for this post now? (y/N): ", "n")).toLowerCase().startsWith("y");
+  if (alsoAward) {
+    const points = parseInt(await ask("Points per responder [2]: ", "2"), 10);
+    if (isNaN(points) || points < 1) return console.log("Invalid points — must be a positive integer.");
+    const hours = parseFloat(await ask(`Time window in hours [${DEFAULT_HOURS}]: `, String(DEFAULT_HOURS)));
+    if (isNaN(hours) || hours <= 0) return console.log("Invalid hours — must be a positive number.");
+    // Operator explicitly chose to award this just-recorded post → bypass dedup.
+    await awardFromThread({ threadUrl, course, points, hours, dryRun: false, skipConfirm: false, topUp: true });
+  }
+}
+
+/** Menu action: print every known post for a course with its grading status. */
+async function menuListPosts() {
+  const course = await pickCourse();
+  if (!course) return console.log("No course selected.");
+  const posts = await getPosts(course);
+  if (posts.length === 0) return console.log("\nNo posts recorded for this course yet.");
+  console.log(`\nPosts for ${course}:\n`);
+  console.log("Date".padEnd(12) + "Status".padEnd(10) + "Pts".padStart(4) + "  " + "Stud".padStart(4) + "  Post");
+  console.log("-".repeat(72));
+  for (const p of posts) {
+    const when = p.awardedAt ? new Date(p.awardedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : (p.addedAt ? new Date(p.addedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—");
+    const status = p.awarded ? "awarded" : "added";
+    const pts = p.awarded ? String(p.points ?? "") : "";
+    const stud = p.awarded ? String(p.studentCount ?? "") : "";
+    const snippet = (p.text || "").replace(/\s+/g, " ").slice(0, 40);
+    console.log(when.padEnd(12) + status.padEnd(10) + pts.padStart(4) + "  " + stud.padStart(4) + "  " + snippet);
   }
 }
 
@@ -149,28 +209,27 @@ function parseArgs(args) {
   return options;
 }
 
-async function main() {
-  const args = process.argv.slice(2);
-  const options = parseArgs(args);
-
-  if (options.help) {
-    printUsage();
-    process.exit(0);
+/**
+ * Run the full award flow for a single Slack thread.
+ * Returns { awarded, threadTs } and never calls process.exit().
+ */
+export async function awardFromThread(options) {
+  // Parse Slack URL once
+  let parsed;
+  try {
+    parsed = parseSlackUrl(options.threadUrl);
+  } catch (error) {
+    console.error(error.message);
+    return { ok: false, awarded: 0, threadTs: null };
   }
 
-  if (!options.threadUrl || !options.course) {
-    printUsage();
-    process.exit(1);
-  }
-
-  if (isNaN(options.points) || options.points < 1) {
-    console.error("Error: Points must be a positive integer");
-    process.exit(1);
-  }
-
-  if (isNaN(options.hours) || options.hours <= 0) {
-    console.error("Error: Hours must be a positive number");
-    process.exit(1);
+  // Dedup guard: skip if already awarded (unless dry-run or top-up)
+  if (!options.dryRun && !options.topUp && (await isAwarded(options.course, parsed.messageTs))) {
+    console.log(
+      `\nThis post is already awarded for ${options.course}. ` +
+        `Re-run with the "top-up new responders" option to add only new repliers.`
+    );
+    return { ok: true, awarded: 0, threadTs: parsed.messageTs };
   }
 
   if (options.dryRun) {
@@ -189,29 +248,20 @@ async function main() {
     roster = loadStudentRoster(options.course);
   } catch (error) {
     console.error(error.message);
-    process.exit(1);
-  }
-
-  // Parse Slack URL
-  let channelId, messageTs;
-  try {
-    ({ channelId, messageTs } = parseSlackUrl(options.threadUrl));
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
+    return { ok: false, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Get parent message to determine time boundary
   let parentMessage;
   try {
-    parentMessage = await getParentMessage(channelId, messageTs);
+    parentMessage = await getParentMessage(parsed.channelId, parsed.messageTs);
   } catch (error) {
     console.error(`Error fetching parent message: ${error.message}`);
-    process.exit(1);
+    return { ok: false, awarded: 0, threadTs: parsed.messageTs };
   }
 
   const parentTs = parseFloat(parentMessage.ts);
-  const cutoffTs = parentTs + options.hours * 60 * 60;
+  const cutoffTs = computeCutoffTs(parentTs, options.hours);
   const parentDate = new Date(parentTs * 1000);
   const cutoffDate = new Date(cutoffTs * 1000);
 
@@ -222,24 +272,21 @@ async function main() {
   // Get thread replies
   let replies;
   try {
-    replies = await getThreadReplies(channelId, messageTs);
+    replies = await getThreadReplies(parsed.channelId, parsed.messageTs);
   } catch (error) {
     console.error(`Error fetching replies: ${error.message}`);
-    process.exit(1);
+    return { ok: false, awarded: 0, threadTs: parsed.messageTs };
   }
 
-  // Filter replies within 24 hours
-  const validReplies = replies.filter((reply) => {
-    const replyTs = parseFloat(reply.ts);
-    return replyTs <= cutoffTs;
-  });
+  // Filter replies within the award window
+  const validReplies = filterRepliesWithinWindow(replies, cutoffTs);
 
   console.log(`Found ${validReplies.length} replies within ${options.hours} hours (${replies.length} total replies).`);
   console.log("");
 
   if (validReplies.length === 0) {
     console.log("No replies to process.");
-    process.exit(0);
+    return { ok: true, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Get unique responders (by user ID to avoid duplicates)
@@ -297,14 +344,14 @@ async function main() {
 
   if (matched.length === 0) {
     console.log("No students matched - nothing to do.");
-    process.exit(0);
+    return { ok: true, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Dry run stops here
   if (options.dryRun) {
     console.log("=== DRY RUN COMPLETE (no changes made) ===");
     console.log("Remove --dry-run flag to actually award points.");
-    process.exit(0);
+    return { ok: true, awarded: 0, threadTs: parsed.messageTs };
   }
 
   // Confirmation prompt
@@ -314,7 +361,7 @@ async function main() {
     );
     if (!confirmed) {
       console.log("Aborted. No changes made.");
-      process.exit(0);
+      return { ok: true, awarded: 0, threadTs: parsed.messageTs };
     }
     console.log("");
   }
@@ -334,9 +381,155 @@ async function main() {
 
   console.log("");
   console.log(`=== COMPLETE: ${awardedCount} students awarded ${options.points} point(s) each ===`);
+
+  // Record results into the ledger (only on real awards). A ledger write
+  // failure must not crash after points were already inserted into grades —
+  // warn loudly instead, since a missing ledger row risks a future double-award.
+  if (awardedCount > 0) {
+    try {
+      await recordPost(options.course, {
+        threadTs: parsed.messageTs,
+        url: options.threadUrl,
+        channel: parsed.channelId,
+        text: parentMessage.text || "",
+        source: "award",
+        awarded: true,
+      });
+      await markAwarded(options.course, parsed.messageTs, {
+        points: options.points,
+        studentCount: awardedCount,
+      });
+    } catch (ledgerError) {
+      console.warn(
+        `\nWarning: points were awarded but the ledger write failed: ${ledgerError.message}`
+      );
+      console.warn(
+        "Re-running this thread may double-award. Verify the slack_posts ledger before retrying."
+      );
+    }
+  }
+
+  return { ok: true, awarded: awardedCount, threadTs: parsed.messageTs };
 }
 
-main().catch((error) => {
-  console.error("Unexpected error:", error);
-  process.exit(1);
-});
+/** Menu action: scan configured channels for offer-posts, then optionally award. */
+async function menuScanOffers() {
+  const course = await pickCourse();
+  if (!course) return console.log("No course selected.");
+
+  console.log("\nScanning Slack (this loads the local model on first run)…");
+  let result;
+  try {
+    result = await scanOffers(course, { listChannels, getChannelHistory, getPermalink });
+  } catch (error) {
+    return console.error(`Scan failed: ${error.message}`);
+  }
+
+  if (result.noReferences) {
+    console.log(
+      "\nNo reference examples yet. Use \"Add post by URL\" to teach the scanner " +
+        "your offer style (or add seedOfferPhrases to slack-checker/config.json), then scan again."
+    );
+    return;
+  }
+
+  console.log(
+    `\nScanned ${result.channelsScanned.join(", ") || "(no channels)"}; ` +
+      `embedded ${result.embeddedCount} messages.`
+  );
+  const { candidates } = result;
+  if (candidates.length === 0) return console.log("No likely point-offer posts found.");
+
+  console.log("\nLikely point-offer posts:\n");
+  candidates.forEach((c, i) => {
+    const flag = c.alreadyAwarded ? " [awarded ✓]" : c.inLedger ? " [in ledger]" : "";
+    const when = new Date(parseFloat(c.ts) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const snippet = (c.text || "").replace(/\s+/g, " ").slice(0, 50);
+    console.log(`  ${i + 1}) ${(c.score * 100).toFixed(0)}% ${when} (${c.channel})${flag}: "${snippet}"`);
+  });
+
+  const pick = await ask("\nAward which post(s)? (comma-separated numbers, or Enter to skip): ");
+  if (!pick) return console.log("No posts selected.");
+  const indices = pick.split(",").map((s) => parseInt(s.trim(), 10) - 1).filter((n) => candidates[n]);
+  if (indices.length === 0) return console.log("No valid selection.");
+
+  const points = parseInt(await ask("Points per responder [2]: ", "2"), 10);
+  if (isNaN(points) || points < 1) return console.log("Invalid points — must be a positive integer.");
+  const hours = parseFloat(await ask(`Time window in hours [${DEFAULT_HOURS}]: `, String(DEFAULT_HOURS)));
+  if (isNaN(hours) || hours <= 0) return console.log("Invalid hours — must be a positive number.");
+
+  for (const n of indices) {
+    const c = candidates[n];
+    let threadUrl;
+    try {
+      threadUrl = await getPermalink(c.channelId, c.ts);
+    } catch (error) {
+      console.error(`  Could not get permalink for #${c.channel} post: ${error.message}`);
+      continue;
+    }
+    console.log(`\n--- Awarding for: ${c.channel} "${(c.text || "").slice(0, 40)}" ---`);
+    await awardFromThread({ threadUrl, course, points, hours, dryRun: false, skipConfirm: false, topUp: c.alreadyAwarded });
+  }
+}
+
+/** Top-level interactive menu. */
+async function runMenu() {
+  console.log("\n=== Slack Participation Points ===");
+  console.log("  1) Scan for new point-offer posts");
+  console.log("  2) Award points from a thread URL");
+  console.log("  3) Add post by URL (teach the scanner)");
+  console.log("  4) List posts & grading status");
+  console.log("  5) Semester setup / fix config           (coming soon)");
+  const choice = await ask("\nChoose an option (1-5): ");
+  switch (choice) {
+    case "1": return menuScanOffers();
+    case "2": return menuAwardFromUrl();
+    case "3": return menuAddByUrl();
+    case "4": return menuListPosts();
+    case "5":
+      return console.log("That option arrives in a later update.");
+    default:
+      return console.log("Unknown option.");
+  }
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const options = parseArgs(args);
+
+  if (options.help) {
+    printUsage();
+    process.exit(0);
+  }
+
+  // No required args on an interactive terminal → show the menu.
+  if ((!options.threadUrl || !options.course) && process.stdin.isTTY) {
+    await runMenu();
+    process.exit(0);
+  }
+  // Non-interactive (or scripted) with missing args → usage and exit.
+  if (!options.threadUrl || !options.course) {
+    printUsage();
+    process.exit(1);
+  }
+
+  if (isNaN(options.points) || options.points < 1) {
+    console.error("Error: Points must be a positive integer");
+    process.exit(1);
+  }
+
+  if (isNaN(options.hours) || options.hours <= 0) {
+    console.error("Error: Hours must be a positive number");
+    process.exit(1);
+  }
+
+  const result = await awardFromThread(options);
+  process.exit(result.ok ? 0 : 1);
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error("Unexpected error:", error);
+    process.exit(1);
+  });
+}
