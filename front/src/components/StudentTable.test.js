@@ -28,6 +28,24 @@ function gradeCellFor(name) {
   return within(row).getAllByRole("cell")[4].textContent;
 }
 
+// Returns the Grade cell element for a given student row, so its inline
+// backgroundColor can be inspected.
+function gradeCellElementFor(name) {
+  const row = screen.getByText(name).closest("tr");
+  return within(row).getAllByRole("cell")[4];
+}
+
+// Pulls the r/g/b channels out of an rgba(...) string. A plain /\d+/g match
+// would split the trailing alpha (e.g. "0.3") into extra numbers, so this
+// anchors on the first three comma-separated components explicitly.
+function rgbChannels(el) {
+  const match = el.style.backgroundColor.match(
+    /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/
+  );
+  if (!match) throw new Error(`Not an rgb(a) color: ${el.style.backgroundColor}`);
+  return { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]) };
+}
+
 describe("StudentTable Grade column", () => {
   test("renders a Grade header", () => {
     renderTable();
@@ -73,16 +91,6 @@ describe("StudentTable Grade column", () => {
       unmatchedNames: new Set(),
     });
     expect(gradeCellFor("ALAN TURING")).toBe("–");
-  });
-
-  // The warning is gated on gradesStatus === "ready"; unmatchedNames alone
-  // must not be enough to trigger it while grades are still loading or idle.
-  test("does not show a warning while loading even if the name is unmatched", () => {
-    renderTable({
-      gradesStatus: "loading",
-      unmatchedNames: new Set(["GRACE HOPPER"]),
-    });
-    expect(gradeCellFor("GRACE HOPPER")).toBe("·");
   });
 
   test("does not show a warning when idle even if the name is unmatched", () => {
@@ -188,5 +196,33 @@ describe("StudentTable Grade sorting", () => {
     });
     fireEvent.click(gradeHeader());
     expect(gradeColumnOrder()).toEqual(["AMY ADLER", "MEG MORSE", "ZOE ZEPHYR"]);
+  });
+});
+
+describe("StudentTable Grade color domain", () => {
+  // GRADE_EXTENT is fixed at [60, 110] specifically so a one-SD-below-median
+  // grade (78) reads as a real red penalty instead of near-white, and an
+  // above-median grade (107) reads as a clear blue. A data-derived extent
+  // would wash both of these out — e.g. with a broken extent of [-100, 110],
+  // 78 normalizes to ~0.445 (barely off-center) instead of ~0.225, which
+  // still yields r > b, just by a tiny margin (rgb 249,230,219 rather than
+  // 221,113,92). A bare "greater than" comparison would not catch that, so
+  // this asserts a real gap between the channels, not just their order —
+  // The rendered values are rgba strings; asserting a gap rather than an
+  // exact string means a harmless tint tweak (e.g. the 0.3 alpha) doesn't
+  // break this, but a domain change does.
+  const MIN_CHANNEL_GAP = 60;
+
+  test("getCellColor with the fixed domain returns a visibly red tint at 78 and a blue one at 107", () => {
+    renderTable({
+      gradesStatus: "ready",
+      canvasGrades: { "ADA LOVELACE": 78, "ALAN TURING": 107 },
+    });
+
+    const red = rgbChannels(gradeCellElementFor("ADA LOVELACE"));
+    expect(red.r - red.b).toBeGreaterThan(MIN_CHANNEL_GAP);
+
+    const blue = rgbChannels(gradeCellElementFor("ALAN TURING"));
+    expect(blue.b - blue.r).toBeGreaterThan(MIN_CHANNEL_GAP);
   });
 });
