@@ -9,7 +9,7 @@ const { MongoClient } = mongodb;
 
 const url = "mongodb://localhost:27017";
 
-const initDate = new Date(2025, 0, 6);
+const initDate = new Date(2026, 4, 6);
 console.log("Using date", initDate.toDateString());
 
 const client = new MongoClient(url);
