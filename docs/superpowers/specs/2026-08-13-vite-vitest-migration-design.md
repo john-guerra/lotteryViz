@@ -62,7 +62,7 @@ Scanned before committing to this design:
 |---|---|
 | Scope | Vite + Vitest only; Playwright is a separate spec |
 | Vite build output | `build.outDir: 'build'` so the backend is untouched |
-| JSX in `.js` files | esbuild loader override — no file renames |
+| JSX in `.js` files | no renames; resolve config empirically (Section 2) |
 | Test configuration | One root `vitest.config.js` with two projects |
 | Test dependency location | Test deps at root, build deps in `front/` |
 
@@ -94,10 +94,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
+  // Start here. @vitejs/plugin-react is Babel-based and handles JSX in .js by
+  // default; see Section 2 for how to escalate only if the build proves otherwise.
   plugins: [react()],
   build: { outDir: "build" },
-  esbuild: { loader: "jsx", include: /src\/.*\.js$/ },
-  optimizeDeps: { esbuildOptions: { loader: { ".js": "jsx" } } },
   server: {
     proxy: Object.fromEntries(
       [
@@ -141,23 +141,36 @@ proxy exists so `vite dev` works for anyone who prefers it, not as the primary p
 
 ## Section 2 — JSX inside `.js` files
 
-19 of 27 files in `front/src` contain JSX with a `.js` extension. Vite does not
-transform JSX in `.js` by default.
+19 of 27 files in `front/src` contain JSX with a `.js` extension.
 
-The esbuild override above handles it with no file renames and no import changes. The
-alternative — renaming all 19 to `.jsx` — is more idiomatic, and imports would still
-resolve without edits, but it rewrites the file identity of every component in the app
-including the ones changed by recent work, for no functional gain.
+**Correction to an earlier draft of this spec.** The claim that "Vite does not transform
+JSX in `.js` by default" is true of Vite's bare esbuild transform, but **not** of a
+project using `@vitejs/plugin-react`. That plugin is Babel-based and processes `.js`,
+`.jsx`, `.ts`, and `.tsx` by default. Since this migration installs the React plugin
+anyway, JSX in `.js` is expected to work with no extra configuration.
 
-**The same override must be mirrored in the root Vitest config**, or component tests
-will fail to parse JSX even though the build succeeds. This is the single most likely
-way to get a half-working migration, and the implementation plan must verify both
-sides independently.
+This is therefore an **empirical question, not a design decision**, and the plan must
+resolve it by running the build rather than by assuming either answer:
 
-If `esbuild.include` proves not to apply to the loader as expected, the fallback is a
-small custom plugin with a `transform` hook applying the `jsx` loader to matching
-files. The plan should treat "the build succeeds AND component tests parse JSX" as the
-acceptance condition, not the presence of a particular config key.
+1. Start with a plain `react()` plugin and no override.
+2. If the build and the component tests both succeed, ship that — no override.
+3. If either fails on JSX syntax, add `react({ include: /\.(js|jsx)$/ })`, the
+   plugin-level option, and re-verify.
+4. Only if that also fails fall back to an esbuild-level override.
+
+Whichever ends up being needed **must be applied in both places** — `front/vite.config.js`
+for the build and the root Vitest config for component tests. A config that satisfies
+one and not the other yields a migration that builds but cannot test, or the reverse.
+That is the single most likely way to get a half-working result.
+
+The acceptance condition is behavioral: **the production build succeeds AND component
+tests parse JSX.** Not the presence of any particular config key. Config that turns out
+to be unnecessary should be removed rather than left in as a talisman — the plan
+includes a deliberate-break check to establish which category each key falls into.
+
+Renaming the 19 files to `.jsx` is rejected regardless of the above: imports would
+still resolve without edits, but it rewrites the file identity of every component in
+the app, including ones changed by recent work, for no functional gain.
 
 ## Section 3 — Vitest at the root
 
@@ -180,7 +193,6 @@ export default defineConfig({
       },
       {
         plugins: [react()],
-        esbuild: { loader: "jsx", include: /front\/src\/.*\.js$/ },
         test: {
           name: "jsdom",
           environment: "jsdom",
@@ -240,9 +252,10 @@ The migration is verified, not assumed:
   Grade column loads, and the export modal opens a preview — the paths most recently
   changed, and the ones exercising both the proxy-relevant routes and JSX-heavy
   components.
-- The deliberate-break check for JSX: temporarily removing the esbuild override must
-  cause component tests to fail. A migration where the override is unnecessary means it
-  is not doing what the spec claims.
+- The deliberate-break check for JSX: if any JSX-related config key was added, removing
+  it must cause a failure. A key whose removal changes nothing is not doing anything and
+  must be deleted rather than kept as a talisman. If no key was needed, record that
+  plainly — `@vitejs/plugin-react` handling `.js` by default is the expected outcome.
 
 ## Out of scope
 
