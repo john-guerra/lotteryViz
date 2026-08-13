@@ -35,6 +35,7 @@ router.post("/delete", function (req, res) {
 
   if (req.ip !== "127.0.0.1") {
     console.log("Request not from localhost ", req.ip, " ignoring");
+    return;
   }
 
   myDB.deleteGrade(req.body, (err) => {

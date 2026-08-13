@@ -12,7 +12,7 @@
     "both:dev": "yarn dev & (cd front && yarn start)",
     "postinstall": "cd front && npm install && npm run build",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "export_to_canvas": "node export-lottery-to-canvas.mjs",
+    "export-to-canvas": "node export-lottery-to-canvas.mjs",
     "check-slack": "node slack-checker/check-responses.mjs"
   },
   "dependencies": {
