@@ -1,3 +1,4 @@
+import path from "node:path";
 import { defineConfig, transformWithOxc } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -17,13 +18,23 @@ import react from "@vitejs/plugin-react";
 // working fix, taken from https://github.com/vitejs/rolldown-vite/discussions/323,
 // is a small pre-transform plugin that force-parses our own .js files as JSX
 // via Vite's own `transformWithOxc` helper.
-const jsxInJsFiles = /(^|\/)src\/.*\.js$/;
+//
+// Scoped by resolved path prefix, anchored to this config file's own
+// directory (import.meta.dirname), not process.cwd() -- cwd depends on where
+// the command is invoked from. A substring/regex match on "src/" would also
+// catch any dependency that ships an unbundled src/ directory (d3's
+// sub-packages do), forcing JSX parsing onto third-party code we don't own.
+const SRC_DIR = path.join(import.meta.dirname, "src") + path.sep;
+function isOwnJsFile(id) {
+  const [filepath] = id.split("?");
+  return filepath.startsWith(SRC_DIR) && filepath.endsWith(".js");
+}
 function jsxInJs() {
   return {
     name: "jsx-in-js",
     enforce: "pre",
     async transform(code, id) {
-      if (!jsxInJsFiles.test(id)) return null;
+      if (!isOwnJsFile(id)) return null;
       return transformWithOxc(code, id, { lang: "jsx" });
     },
   };
