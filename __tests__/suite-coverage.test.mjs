@@ -8,16 +8,25 @@ import path from "node:path";
 // exit code 0, "Test Files 1 passed (1)", "Tests 13 passed (13)" -- the
 // jsdom project's output alone -- while all 144 node tests silently
 // stopped running. Nothing about that green run distinguishes it from a
-// legitimately smaller suite; a human has to remember "157" is the number
+// legitimately smaller suite; a human has to remember "159" is the number
 // to expect and notice when it quietly isn't.
 //
 // This guard walks the filesystem directly for the same directories the
 // two vitest.config.js projects declare in `include` -- deliberately NOT
-// parsing vitest.config.js itself, so the guard also catches the config
-// drifting away from where the test files actually live, not just the
-// files disappearing.
+// parsing vitest.config.js itself, so it also catches the config drifting
+// away from where the files actually live, not just the files disappearing.
+//
+// This file cannot catch the node project's OWN `include` glob breaking
+// (this file is discovered through that same glob, so it would be excluded
+// right along with everything else it's supposed to protect). That case is
+// covered separately, and unconditionally, by ../vitest.global-setup.mjs
+// (wired up as Vitest's top-level `globalSetup` in vitest.config.js), which
+// runs before any project's `include` is evaluated and asks each project to
+// re-run its own real, currently configured include glob via Vitest's
+// `globTestFiles()` API -- see that file for the full reasoning.
 const ROOT = path.join(import.meta.dirname, "..");
-const SELF = import.meta.filename ?? import.meta.dirname + "/suite-coverage.test.mjs";
+const SELF =
+  import.meta.filename ?? import.meta.dirname + "/suite-coverage.test.mjs";
 
 function findTestFiles(relDir, extensions) {
   const absDir = path.join(ROOT, relDir);
