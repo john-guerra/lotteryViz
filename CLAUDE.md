@@ -16,16 +16,29 @@ The recommended workflow for testing frontend changes:
 2. Build: `cd front && yarn build`
 3. Test via backend at `http://localhost:4001`
 
-This is preferred over running the frontend dev server because:
+This is preferred over running the frontend's Vite dev server because:
 - Single server to manage
 - Matches production behavior
 - No CORS/proxy configuration needed
 
+Frontend component tests now run from the repo root via `yarn test`, alongside the
+backend suite, on a single Vitest config — not from inside `front/`. `cd front && yarn
+test` no longer exists (there is no `test` script in `front/package.json`). Previously
+the two suites ran separately and a test placed in the wrong tree silently never ran;
+that split is gone.
+
 ### Other commands
 
 - `yarn backup` - Manually run database backup
-- `yarn test` - Run tests
+- `yarn test` - Run all 159 tests (backend + frontend) via Vitest
+- `yarn test --project node` - Backend `.mjs` suites only (146 tests)
+- `yarn test --project jsdom` - Frontend component tests only (13 tests)
 - `yarn export_to_canvas` - Export lottery data to Canvas LMS
+
+A Vitest project whose `include` glob matches no files reports SUCCESS with zero tests
+run, so half the suite could silently stop running on a green build; `vitest.global-
+setup.mjs` guards against exactly that and fails the run loudly if a project's test
+count drops below its expected floor.
 
 ## Architecture
 
@@ -53,4 +66,4 @@ scripted, repeatable automation — for example asserting on `localStorage`, dri
 same flow many times, or running without a visible browser.
 
 Either way, validate against the backend at `http://localhost:4001` after
-`cd front && yarn build` rather than the frontend dev server.
+`cd front && yarn build` rather than the Vite dev server.
