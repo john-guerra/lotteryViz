@@ -16,6 +16,13 @@ import { jsxInJs } from "./front/vite-jsx-in-js.mjs";
 // can't drift apart on this escalation.
 export default defineConfig({
   test: {
+    // Runs once per `vitest run` invocation, before any project's `include`
+    // glob is evaluated -- so it fires even if a project's include pattern
+    // ends up matching zero files, which is exactly when a coverage check
+    // needs to run and exactly what __tests__/suite-coverage.test.mjs
+    // (discovered through the node project's own include glob) cannot
+    // detect about its own project. See vitest.global-setup.mjs.
+    globalSetup: ["./vitest.global-setup.mjs"],
     // The suite uses bare describe/test/expect with no `import { describe } from
     // "vitest"` (carried over unchanged from Jest, which injects these as
     // globals). `globals: true` on each project reproduces that. Vitest does
