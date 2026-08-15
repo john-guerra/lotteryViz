@@ -1,8 +1,12 @@
 // Course registry. students.mjs is gitignored and holds DATA ONLY; this tracked
 // module holds the logic that derives the course list from it. Frontend-safe:
-// it must never import canvas-config.json, which lives outside front/src/ and
-// would be rejected by CRA's ModuleScopePlugin. The archived-semester fallback
-// lives on the backend, in export-lottery-to-canvas.mjs.
+// it must never import canvas-config.json, which lives outside front/src/.
+// Vite's dev server would reject that anyway (server.fs.allow defaults to
+// the front/ workspace root, so a request for a file above it 403s), but the
+// real reason is that canvas-config.json holds private Canvas IDs that must
+// never ship in the client-visible bundle -- a rule the build tooling
+// doesn't enforce, so it has to hold by convention. The archived-semester
+// fallback lives on the backend, in export-lottery-to-canvas.mjs.
 import { classes } from "./students.mjs";
 
 export const COURSE_STORAGE_KEY = "lottery.course";
