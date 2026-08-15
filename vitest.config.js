@@ -14,14 +14,19 @@ import { jsxInJs } from "./front/vite-jsx-in-js.mjs";
 // front/vite-jsx-in-js.mjs for the full reasoning and upstream citation).
 // Imported from front/ rather than duplicated so the build and test configs
 // can't drift apart on this escalation.
+//
+// That said, this file does NOT read ./front/vite.config.mjs -- it only
+// shares the jsxInJs plugin above. If resolution-affecting options are
+// added there -- resolve.alias, define, CSS modules/handling, env vars --
+// mirror them in the jsdom project below too, or tests will validate
+// against different module resolution than what actually ships in the
+// build.
 export default defineConfig({
   test: {
     // Runs once per `vitest run` invocation, before any project's `include`
     // glob is evaluated -- so it fires even if a project's include pattern
-    // ends up matching zero files, which is exactly when a coverage check
-    // needs to run and exactly what __tests__/suite-coverage.test.mjs
-    // (discovered through the node project's own include glob) cannot
-    // detect about its own project. See vitest.global-setup.mjs.
+    // ends up matching zero files, or a project is renamed/deleted outright.
+    // See vitest.global-setup.mjs.
     globalSetup: ["./vitest.global-setup.mjs"],
     // The suite uses bare describe/test/expect with no `import { describe } from
     // "vitest"` (carried over unchanged from Jest, which injects these as

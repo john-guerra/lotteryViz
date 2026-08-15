@@ -30,8 +30,8 @@ that split is gone.
 ### Other commands
 
 - `yarn backup` - Manually run database backup
-- `yarn test` - Run all 159 tests (backend + frontend) via Vitest
-- `yarn test --project node` - Backend `.mjs` suites only (146 tests)
+- `yarn test` - Run all 157 tests (backend + frontend) via Vitest
+- `yarn test --project node` - Backend `.mjs` suites only (144 tests)
 - `yarn test --project jsdom` - Frontend component tests only (13 tests)
 - `yarn export-to-canvas` - Export lottery data to Canvas LMS
 
