@@ -33,12 +33,13 @@ that split is gone.
 - `yarn test` - Run all 159 tests (backend + frontend) via Vitest
 - `yarn test --project node` - Backend `.mjs` suites only (146 tests)
 - `yarn test --project jsdom` - Frontend component tests only (13 tests)
-- `yarn export_to_canvas` - Export lottery data to Canvas LMS
+- `yarn export-to-canvas` - Export lottery data to Canvas LMS
 
 A Vitest project whose `include` glob matches no files reports SUCCESS with zero tests
 run, so half the suite could silently stop running on a green build; `vitest.global-
 setup.mjs` guards against exactly that and fails the run loudly if a project's test
-count drops below its expected floor.
+count drops below its expected floor. Do not delete it to "simplify" the config — that
+removes the only thing that would catch this failure mode.
 
 ## Architecture
 
