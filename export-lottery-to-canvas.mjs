@@ -4,9 +4,9 @@
  * Export lottery participation grades to Canvas
  *
  * Usage:
- *   npm run export_to_canvas -- --course my_course --dry-run
- *   npm run export_to_canvas -- --course my_course
- *   npm run export_to_canvas -- --all
+ *   npm run export-to-canvas -- --course my_course --dry-run
+ *   npm run export-to-canvas -- --course my_course
+ *   npm run export-to-canvas -- --all
  */
 
 import myDB from "./db/myDB.js";
@@ -974,9 +974,9 @@ Options:
   --help, -h             Show this help message
 
 Examples:
-  npm run export_to_canvas -- --course my_course --dry-run
-  npm run export_to_canvas -- --all
-  npm run export_to_canvas -- -c my_course -v
+  npm run export-to-canvas -- --course my_course --dry-run
+  npm run export-to-canvas -- --all
+  npm run export-to-canvas -- -c my_course -v
 `);
       process.exit(0);
     }
