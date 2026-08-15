@@ -6,7 +6,6 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@john-guerra/lottery-results-from-mongo": "https://api.observablehq.com/@john-guerra/lottery-results-from-mongo@87.tgz?v=3",
     "@observablehq/runtime": "5.8",
-    "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "add": "^2.0.6",
@@ -24,12 +23,6 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
   },
   "browserslist": {
     "production": [
