@@ -13,6 +13,12 @@ import { jsxInJs } from "./vite-jsx-in-js.mjs";
 // project, so the build and test configs can't drift apart on this escalation.
 // See that module's comments for the full reasoning and upstream citation.
 
+// This config and the root ../vitest.config.js (jsdom project) do NOT share
+// anything beyond the jsxInJs plugin. If you add resolution-affecting
+// options here -- resolve.alias, define, CSS modules/handling, env vars --
+// mirror them in ../vitest.config.js too, or tests will validate against
+// different module resolution than what actually ships in the build.
+
 const BACKEND = "http://localhost:4001";
 
 // CRA's "proxy" field forwarded every unmatched request. Vite matches explicit
