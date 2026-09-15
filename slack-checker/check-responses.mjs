@@ -24,8 +24,13 @@ try {
   // .env file not found, rely on environment variables
 }
 
-// Import after loading env
-const { parseSlackUrl, getThreadReplies, getParentMessage, getUserDisplayNames, listChannels, getChannelHistory, getPermalink } = await import("./slack-api.mjs");
+// slack-api.mjs used to read SLACK_BOT_TOKEN at import time (and process.exit
+// on a missing one), which is why this was a dynamic import placed after the
+// .env block above. It is now a token-less factory module and slack-workspace
+// resolves per-course tokens lazily, so a plain static import is safe.
+import { parseSlackUrl } from "./slack-api.mjs";
+import { getSlackApiForCourse } from "./slack-workspace.mjs";
+import { runDoctor, formatReport } from "./doctor.mjs";
 import { loadStudentRoster, matchNames, getAvailableCourses } from "./matcher.mjs";
 import { recordPost, markAwarded, isAwarded, getPosts } from "./ledger.mjs";
 import { scanOffers } from "./scan.mjs";
@@ -130,7 +135,15 @@ async function menuAddByUrl() {
   } catch (error) {
     return console.error(error.message);
   }
-  const parent = await getParentMessage(parsed.channelId, parsed.messageTs);
+  let parent;
+  try {
+    parent = await getSlackApiForCourse(course).getParentMessage(
+      parsed.channelId,
+      parsed.messageTs
+    );
+  } catch (error) {
+    return console.error(error.message);
+  }
   await recordPost(course, {
     threadTs: parsed.messageTs,
     url: threadUrl,
@@ -223,6 +236,16 @@ export async function awardFromThread(options) {
     return { ok: false, awarded: 0, threadTs: null };
   }
 
+  // Resolve the Slack workspace this course is taught in. Fails here, before
+  // any Mongo work, when the course's token is missing from .env.
+  let slack;
+  try {
+    slack = getSlackApiForCourse(options.course);
+  } catch (error) {
+    console.error(error.message);
+    return { ok: false, awarded: 0, threadTs: parsed.messageTs };
+  }
+
   // Dedup guard: skip if already awarded (unless dry-run or top-up)
   if (!options.dryRun && !options.topUp && (await isAwarded(options.course, parsed.messageTs))) {
     console.log(
@@ -254,7 +277,7 @@ export async function awardFromThread(options) {
   // Get parent message to determine time boundary
   let parentMessage;
   try {
-    parentMessage = await getParentMessage(parsed.channelId, parsed.messageTs);
+    parentMessage = await slack.getParentMessage(parsed.channelId, parsed.messageTs);
   } catch (error) {
     console.error(`Error fetching parent message: ${error.message}`);
     return { ok: false, awarded: 0, threadTs: parsed.messageTs };
@@ -272,7 +295,7 @@ export async function awardFromThread(options) {
   // Get thread replies
   let replies;
   try {
-    replies = await getThreadReplies(parsed.channelId, parsed.messageTs);
+    replies = await slack.getThreadReplies(parsed.channelId, parsed.messageTs);
   } catch (error) {
     console.error(`Error fetching replies: ${error.message}`);
     return { ok: false, awarded: 0, threadTs: parsed.messageTs };
@@ -294,7 +317,7 @@ export async function awardFromThread(options) {
 
   // Get display names for all users
   console.log(`Fetching display names for ${uniqueUserIds.length} unique users...`);
-  const userNames = await getUserDisplayNames(uniqueUserIds);
+  const userNames = await slack.getUserDisplayNames(uniqueUserIds);
   console.log("");
 
   // Match to roster
@@ -420,7 +443,7 @@ async function menuScanOffers() {
   console.log("\nScanning Slack (this loads the local model on first run)…");
   let result;
   try {
-    result = await scanOffers(course, { listChannels, getChannelHistory, getPermalink });
+    result = await scanOffers(course, getSlackApiForCourse(course));
   } catch (error) {
     return console.error(`Scan failed: ${error.message}`);
   }
@@ -462,7 +485,7 @@ async function menuScanOffers() {
     const c = candidates[n];
     let threadUrl;
     try {
-      threadUrl = await getPermalink(c.channelId, c.ts);
+      threadUrl = await getSlackApiForCourse(course).getPermalink(c.channelId, c.ts);
     } catch (error) {
       console.error(`  Could not get permalink for #${c.channel} post: ${error.message}`);
       continue;
@@ -473,21 +496,26 @@ async function menuScanOffers() {
 }
 
 /** Top-level interactive menu. */
+/** Menu action: verify every course's token, workspace, and channel access. */
+async function menuCheckConfig() {
+  console.log("\nChecking each configured course against Slack...\n");
+  console.log(formatReport(await runDoctor()));
+}
+
 async function runMenu() {
   console.log("\n=== Slack Participation Points ===");
   console.log("  1) Scan for new point-offer posts");
   console.log("  2) Award points from a thread URL");
   console.log("  3) Add post by URL (teach the scanner)");
   console.log("  4) List posts & grading status");
-  console.log("  5) Semester setup / fix config           (coming soon)");
+  console.log("  5) Check configuration (tokens, workspaces, channels)");
   const choice = await ask("\nChoose an option (1-5): ");
   switch (choice) {
     case "1": return menuScanOffers();
     case "2": return menuAwardFromUrl();
     case "3": return menuAddByUrl();
     case "4": return menuListPosts();
-    case "5":
-      return console.log("That option arrives in a later update.");
+    case "5": return menuCheckConfig();
     default:
       return console.log("Unknown option.");
   }

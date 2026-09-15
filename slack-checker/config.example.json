@@ -1,5 +1,6 @@
 {
   "<course_key>": {
+    "tokenEnv": "SLACK_BOT_TOKEN_<course_key>",
     "channels": ["#general", "#announcements", "#classchat"],
     "semesterStart": "2026-05-04",
     "semesterEnd": "2026-08-21",

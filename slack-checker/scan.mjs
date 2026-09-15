@@ -42,7 +42,6 @@ export async function scanOffers(course, slack) {
       console.log(`  Skipping ${name}: channel not found (is the bot a member?).`);
       continue;
     }
-    channelsScanned.push(name);
     let history;
     try {
       history = await slack.getChannelHistory(channelId, { oldest, latest });
@@ -50,6 +49,10 @@ export async function scanOffers(course, slack) {
       console.log(`  Skipping ${name}: ${error.message}`);
       continue;
     }
+    // Recorded only after the fetch succeeds: pushing before it meant a
+    // skipped channel was still reported as scanned, contradicting the
+    // "Skipping ..." line printed immediately above.
+    channelsScanned.push(name);
     const filtered = cfg.instructorSlackId
       ? history.filter((m) => m.user === cfg.instructorSlackId)
       : history;

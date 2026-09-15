@@ -7,6 +7,7 @@ import { loadDotenv } from "../loadDotenv.mjs";
 import { getAvailableCourses } from "../slack-checker/matcher.mjs";
 import { getPosts } from "../slack-checker/ledger.mjs";
 import { scanOffers } from "../slack-checker/scan.mjs";
+import { getSlackApiForCourse } from "../slack-checker/slack-workspace.mjs";
 import {
   buildDeps,
   previewThread,
@@ -30,21 +31,21 @@ function localhostOnly(req, res, next) {
   return res.status(403).json({ error: "This action is only allowed from localhost." });
 }
 
-// Build the award-service deps from the lazily-imported slack-api module.
-async function getDeps() {
-  return buildDeps(await getSlackApi());
+// Courses are taught in different Slack workspaces, so the client is resolved
+// per course rather than once per process. getSlackApiForCourse throws a
+// message naming the course and the .env variable when a token is missing;
+// callers turn that into a 503, as the old global-token check did.
+//
+// (This used to lazily `await import()` slack-api.mjs because that module
+// called process.exit(1) on a missing SLACK_BOT_TOKEN and would have killed the
+// server at startup. It no longer reads the environment at import time.)
+function getSlackApi(course) {
+  return getSlackApiForCourse(course);
 }
 
-// slack-api.mjs calls process.exit(1) at import time when SLACK_BOT_TOKEN is
-// unset. Import it lazily (and only once a token exists) so a missing token
-// yields a clean 503 instead of killing the server. The module is cached.
-let slackApiPromise = null;
-function getSlackApi() {
-  if (!process.env.SLACK_BOT_TOKEN) {
-    throw new Error("SLACK_BOT_TOKEN is not set — add it to .env to use Slack features.");
-  }
-  if (!slackApiPromise) slackApiPromise = import("../slack-checker/slack-api.mjs");
-  return slackApiPromise;
+/** Build the award-service deps bound to one course's workspace. */
+function getDeps(course) {
+  return buildDeps(getSlackApi(course));
 }
 
 // --- In-memory scan job store --------------------------------------------
@@ -68,7 +69,7 @@ router.post("/scan", async (req, res) => {
 
   let slackApi;
   try {
-    slackApi = await getSlackApi();
+    slackApi = getSlackApi(course);
   } catch (err) {
     return res.status(503).json({ error: err.message });
   }
@@ -77,13 +78,12 @@ router.post("/scan", async (req, res) => {
   scanJobs.set(jobId, { status: "running", course });
   inFlightByCourse.set(course, jobId);
 
-  const { listChannels, getChannelHistory, getPermalink } = slackApi;
-  scanOffers(course, { listChannels, getChannelHistory, getPermalink })
+  scanOffers(course, slackApi)
     .then(async (result) => {
       // Resolve a permalink per candidate so the UI can preview/award it by URL.
       for (const c of result.candidates || []) {
         try {
-          c.url = await getPermalink(c.channelId, c.ts);
+          c.url = await slackApi.getPermalink(c.channelId, c.ts);
         } catch {
           c.url = null;
         }
@@ -121,7 +121,7 @@ router.post("/preview", async (req, res) => {
   }
   let deps;
   try {
-    deps = await getDeps();
+    deps = getDeps(course);
   } catch (err) {
     return res.status(503).json({ error: err.message });
   }
@@ -146,7 +146,7 @@ router.post("/award", localhostOnly, async (req, res) => {
   }
   let deps;
   try {
-    deps = await getDeps();
+    deps = getDeps(course);
   } catch (err) {
     return res.status(503).json({ error: err.message });
   }
@@ -171,7 +171,7 @@ router.post("/add-by-url", localhostOnly, async (req, res) => {
   }
   let deps;
   try {
-    deps = await getDeps();
+    deps = getDeps(course);
   } catch (err) {
     return res.status(503).json({ error: err.message });
   }

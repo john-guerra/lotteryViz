@@ -14,9 +14,35 @@ const url = process.env.MONGO_URL || "mongodb://localhost:27017";
 const BACKUPS_DIR = path.join(__dirname, "backups");
 const MAX_BACKUPS = 10;
 
-// Get database names from the courses defined in students.mjs
-function getConfiguredDatabases() {
-  return Object.keys(classes).map((course) => `lottery_${course}`);
+const DB_PREFIX = "lottery_";
+
+/**
+ * Decide which databases a backup run should export.
+ *
+ * Deliberately driven by what is actually in MongoDB, not just by
+ * `Object.keys(classes)`. Deriving the list from students.mjs alone meant a
+ * finished semester stopped being backed up the moment its course key was
+ * commented out at semester rollover -- silently, on a successful run. Every
+ * `lottery_*` database is therefore included, whether or not a course key
+ * still names it.
+ *
+ * Configured course keys are still unioned in so a brand-new course appears in
+ * the manifest (as 0 records) before anyone has entered a grade for it.
+ */
+export function selectBackupDatabases(existingDbNames, courseKeys) {
+  const configured = courseKeys.map((course) => `${DB_PREFIX}${course}`);
+  const existing = existingDbNames.filter(
+    (name) => name.startsWith(DB_PREFIX) && name.length > DB_PREFIX.length
+  );
+  return [...new Set([...existing, ...configured])].sort();
+}
+
+async function listLotteryDatabases(client) {
+  const { databases } = await client.db().admin().listDatabases();
+  return selectBackupDatabases(
+    databases.map((d) => d.name),
+    Object.keys(classes)
+  );
 }
 
 function formatTimestamp(date) {
@@ -133,10 +159,10 @@ async function backup() {
     await client.connect();
     console.log("Connected to MongoDB");
 
-    const databases = getConfiguredDatabases();
+    const databases = await listLotteryDatabases(client);
 
     if (databases.length === 0) {
-      console.log("No courses configured in students.mjs. Skipping backup.");
+      console.log("No lottery databases found. Skipping backup.");
       return;
     }
 
