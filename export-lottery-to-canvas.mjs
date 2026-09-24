@@ -409,6 +409,20 @@ function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
 }
 
 /**
+ * Mark unmatched lottery entries whose name is no longer on the course roster.
+ * An entry that is off the roster AND has no Canvas match most likely belongs
+ * to a student who dropped. With no roster (archived courses) nothing is
+ * flagged, since absence from a missing list proves nothing.
+ */
+function tagLikelyDropped(unmatchedLottery, roster) {
+  const onRoster = new Set((roster || []).map(normalizeName));
+  return unmatchedLottery.map((entry) => ({
+    ...entry,
+    likelyDropped: Boolean(roster) && !onRoster.has(normalizeName(entry.name)),
+  }));
+}
+
+/**
  * Compute percentile-based grade
  *
  * Formula:
@@ -528,16 +542,22 @@ async function verifyGrades(courseId, assignmentId, expectedGrades) {
  */
 async function processCourse(courseName, options = {}) {
   const { dryRun = false, verbose = false } = options;
+  // The web export passes `log` to stream these lines to the browser; the CLI
+  // leaves it unset and keeps printing to the terminal.
+  const log = options.log
+    ? (...args) => options.log(args.join(" "))
+    : console.log;
+  const logError = options.log ? log : console.error;
 
-  console.log(`\n${"=".repeat(60)}`);
-  console.log(`Processing course: ${courseName}`);
-  console.log(`Mode: ${dryRun ? "DRY RUN" : "LIVE"}`);
-  console.log(`${"=".repeat(60)}\n`);
+  log(`\n${"=".repeat(60)}`);
+  log(`Processing course: ${courseName}`);
+  log(`Mode: ${dryRun ? "DRY RUN" : "LIVE"}`);
+  log(`${"=".repeat(60)}\n`);
 
   const courseConfig = resolveCourseConfig(courseName);
   if (!courseConfig) {
-    console.error(`Course "${courseName}" not found in config.`);
-    console.log(
+    logError(`Course "${courseName}" not found in config.`);
+    log(
       "Available courses:",
       [
         ...Object.keys(classes).filter((k) => classes[k].canvas),
@@ -561,13 +581,13 @@ async function processCourse(courseName, options = {}) {
   // an unconfigured assignment still computes grades correctly.
 
   // Step 1: Get lottery data from MongoDB
-  console.log("Fetching lottery data from MongoDB...");
+  log("Fetching lottery data from MongoDB...");
   let lotteryCounts;
   try {
     lotteryCounts = await getLotteryCounts(courseName);
-    console.log(`  Found ${lotteryCounts.length} students with lottery entries`);
+    log(`  Found ${lotteryCounts.length} students with lottery entries`);
   } catch (error) {
-    console.error("  Error fetching lottery data:", error.message);
+    logError("  Error fetching lottery data:", error.message);
     return { success: false, error: error.message };
   }
 
@@ -578,41 +598,41 @@ async function processCourse(courseName, options = {}) {
     awardedPosts = await getAwardedPosts(courseName);
     postsByUrl = Object.fromEntries(awardedPosts.map((p) => [p.url, p]));
   } catch (error) {
-    console.log("  Note: could not load Slack ledger:", error.message);
+    log("  Note: could not load Slack ledger:", error.message);
   }
 
   // Step 2: Get Canvas enrollments
-  console.log("Fetching Canvas enrollments...");
+  log("Fetching Canvas enrollments...");
   let canvasEnrollments;
   try {
     canvasEnrollments = await getCanvasEnrollments(canvasId);
-    console.log(`  Found ${canvasEnrollments.length} enrolled students`);
+    log(`  Found ${canvasEnrollments.length} enrolled students`);
   } catch (error) {
-    console.error("  Error fetching Canvas enrollments:", error.message);
+    logError("  Error fetching Canvas enrollments:", error.message);
     return { success: false, error: error.message };
   }
 
   // Step 3: Match lottery names to Canvas students
-  console.log("Matching students...");
+  log("Matching students...");
   const { matched, unmatchedLottery, noLotteryEntries, ties } = matchLotteryToCanvas(
     lotteryCounts,
     canvasEnrollments
   );
-  console.log(`  Matched: ${matched.length}`);
-  console.log(`  Unmatched lottery entries: ${unmatchedLottery.length}`);
-  console.log(`  Canvas students with no lottery entries: ${noLotteryEntries.length}`);
+  log(`  Matched: ${matched.length}`);
+  log(`  Unmatched lottery entries: ${unmatchedLottery.length}`);
+  log(`  Canvas students with no lottery entries: ${noLotteryEntries.length}`);
   if (ties.length > 0) {
-    console.log(`  Matching ties requiring review: ${ties.length}`);
+    log(`  Matching ties requiring review: ${ties.length}`);
   }
 
   // Step 3.5: Fetch all individual lottery entries for detailed comments
-  console.log("Fetching individual lottery entries...");
+  log("Fetching individual lottery entries...");
   let allEntries = [];
   try {
     allEntries = await getAllLotteryEntries(courseName);
-    console.log(`  Found ${allEntries.length} individual entries`);
+    log(`  Found ${allEntries.length} individual entries`);
   } catch (error) {
-    console.error("  Error fetching lottery entries:", error.message);
+    logError("  Error fetching lottery entries:", error.message);
     // Continue without detailed entries - comments will show "(No entries)"
   }
 
@@ -686,19 +706,19 @@ async function processCourse(courseName, options = {}) {
   studentsWithGrades.sort((a, b) => b.points - a.points);
 
   // Step 6: Display results
-  console.log("\n--- Grade Preview ---\n");
-  console.log(
+  log("\n--- Grade Preview ---\n");
+  log(
     "Name".padEnd(35) +
       "Calls".padStart(7) +
       "Points".padStart(8) +
       "Percentile".padStart(12) +
       "Grade".padStart(8)
   );
-  console.log("-".repeat(70));
+  log("-".repeat(70));
 
   for (const student of studentsWithGrades) {
     const name = student.canvasName.substring(0, 34);
-    console.log(
+    log(
       name.padEnd(35) +
         student.calls.toString().padStart(7) +
         student.points.toString().padStart(8) +
@@ -711,39 +731,39 @@ async function processCourse(courseName, options = {}) {
 
   // Matching ties — require manual review
   if (ties.length > 0) {
-    console.log("\n" + "!".repeat(70));
-    console.log("!!  ACTION REQUIRED: Matching ties detected — manual review needed  !!");
-    console.log("!".repeat(70));
-    console.log("Multiple lottery entries matched the same Canvas student with identical");
-    console.log("confidence. The first entry was kept, but this may be wrong.\n");
+    log("\n" + "!".repeat(70));
+    log("!!  ACTION REQUIRED: Matching ties detected — manual review needed  !!");
+    log("!".repeat(70));
+    log("Multiple lottery entries matched the same Canvas student with identical");
+    log("confidence. The first entry was kept, but this may be wrong.\n");
     for (const tie of ties) {
-      console.log(`  Canvas: ${tie.canvasName} (score: ${tie.score}%)`);
-      console.log(`    Tied entries: ${tie.entries.join(", ")}`);
+      log(`  Canvas: ${tie.canvasName} (score: ${tie.score}%)`);
+      log(`    Tied entries: ${tie.entries.join(", ")}`);
     }
-    console.log("");
+    log("");
   }
 
   // Canvas students with NO lottery entries — prominent warning
   if (noLotteryEntries.length > 0) {
-    console.log("\n" + "!".repeat(70));
-    console.log("!!  WARNING: Canvas students with NO lottery entries in MongoDB  !!");
-    console.log("!".repeat(70));
-    console.log("These students are enrolled in Canvas but have no matching lottery record.");
-    console.log("They will receive 0 points.\n");
+    log("\n" + "!".repeat(70));
+    log("!!  WARNING: Canvas students with NO lottery entries in MongoDB  !!");
+    log("!".repeat(70));
+    log("These students are enrolled in Canvas but have no matching lottery record.");
+    log("They will receive 0 points.\n");
     for (const entry of noLotteryEntries) {
-      console.log(`  [!] ${entry.canvasName}`);
+      log(`  [!] ${entry.canvasName}`);
     }
-    console.log("");
+    log("");
   }
 
   // MongoDB entries not matched to Canvas — informational
   if (unmatchedLottery.length > 0) {
-    console.log("\n--- Unmatched Lottery Entries (not in Canvas) ---\n");
+    log("\n--- Unmatched Lottery Entries (not in Canvas) ---\n");
     for (const entry of unmatchedLottery) {
       const reason = entry.displaced
         ? "DISPLACED by higher-confidence match"
         : "no Canvas match found";
-      console.log(
+      log(
         `  ${entry.name} (${entry.calls} calls, ${entry.points} pts) - ${reason} | Best: ${entry.bestMatch || "none"} (${entry.bestScore}%)`
       );
     }
@@ -759,14 +779,14 @@ async function processCourse(courseName, options = {}) {
   const allCallsSorted = [...allStudents.map((s) => s.calls)].sort((a, b) => a - b);
   stats.medianCalls = allCallsSorted[Math.floor(allCallsSorted.length / 2)];
 
-  console.log("\n--- Statistics ---");
-  console.log(`  Total students: ${stats.total}`);
+  log("\n--- Statistics ---");
+  log(`  Total students: ${stats.total}`);
   const rawMedian = allPointsSorted[Math.floor(allPointsSorted.length / 2)];
   const medianDisplay = medianAdjustment > 0
     ? `${stats.median} (raw: ${rawMedian}, adjustment: -${medianAdjustment})`
     : `${stats.median}`;
-  console.log(`  Points - Min: ${stats.min}, Max: ${stats.max}, Median: ${medianDisplay}, Mean: ${stats.mean.toFixed(1)}`);
-  console.log(`  Calls - Median: ${stats.medianCalls}`);
+  log(`  Points - Min: ${stats.min}, Max: ${stats.max}, Median: ${medianDisplay}, Mean: ${stats.mean.toFixed(1)}`);
+  log(`  Calls - Median: ${stats.medianCalls}`);
 
   // Hoisted above the dry-run branch so they are visible at the return, letting
   // an HTTP caller report the outcome. A dry run returns zeros and null.
@@ -781,7 +801,7 @@ async function processCourse(courseName, options = {}) {
     try {
       assignmentGroups = await getAssignmentGroups(canvasId);
     } catch (error) {
-      console.log("  Warning: Could not fetch assignment groups:", error.message);
+      log("  Warning: Could not fetch assignment groups:", error.message);
     }
     const getGroupName = (groupId) => {
       const group = assignmentGroups.find((g) => g.id === groupId);
@@ -794,7 +814,7 @@ async function processCourse(courseName, options = {}) {
     let assignmentGroupName;
 
     if (!assignmentId) {
-      console.log("\n--- Checking for Existing Assignment ---");
+      log("\n--- Checking for Existing Assignment ---");
       assignmentName = "Lottery Grade";
       try {
         // Check for existing assignment first
@@ -802,11 +822,11 @@ async function processCourse(courseName, options = {}) {
         if (existing) {
           assignmentId = existing.id;
           assignmentGroupName = getGroupName(existing.assignment_group_id);
-          console.log(`  Found existing assignment: "${assignmentName}" (ID: ${assignmentId})`);
-          console.log(`  Assignment group: ${assignmentGroupName}`);
+          log(`  Found existing assignment: "${assignmentName}" (ID: ${assignmentId})`);
+          log(`  Assignment group: ${assignmentGroupName}`);
           logChange(`ASSIGNMENT FOUND: "${assignmentName}" (ID: ${assignmentId}) in group "${assignmentGroupName}"`);
         } else {
-          console.log("  No existing assignment found, creating new one...");
+          log("  No existing assignment found, creating new one...");
           const newAssignment = await createLotteryAssignment(
             canvasId,
             assignmentName,
@@ -814,9 +834,9 @@ async function processCourse(courseName, options = {}) {
           );
           assignmentId = newAssignment.id;
           assignmentGroupName = getGroupName(newAssignment.assignment_group_id);
-          console.log(`  Created assignment ID: ${assignmentId}`);
-          console.log(`  Assignment group: ${assignmentGroupName}`);
-          console.log(
+          log(`  Created assignment ID: ${assignmentId}`);
+          log(`  Assignment group: ${assignmentGroupName}`);
+          log(
             `  Update canvas-config.json with: "lotteryAssignmentId": ${assignmentId}`
           );
           logChange(`ASSIGNMENT CREATED: "${assignmentName}" (ID: ${assignmentId}) in group "${assignmentGroupName}"`);
@@ -831,18 +851,18 @@ async function processCourse(courseName, options = {}) {
         const assignment = await getAssignment(canvasId, assignmentId);
         assignmentName = assignment.name;
         assignmentGroupName = getGroupName(assignment.assignment_group_id);
-        console.log(`\n--- Using Configured Assignment ---`);
-        console.log(`  Assignment: "${assignmentName}" (ID: ${assignmentId})`);
-        console.log(`  Assignment group: ${assignmentGroupName}`);
+        log(`\n--- Using Configured Assignment ---`);
+        log(`  Assignment: "${assignmentName}" (ID: ${assignmentId})`);
+        log(`  Assignment group: ${assignmentGroupName}`);
         logChange(`ASSIGNMENT: "${assignmentName}" (ID: ${assignmentId}) in group "${assignmentGroupName}"`);
       } catch (error) {
-        console.log(`  Warning: Could not fetch assignment details: ${error.message}`);
+        log(`  Warning: Could not fetch assignment details: ${error.message}`);
         assignmentName = `Assignment ${assignmentId}`;
         assignmentGroupName = "Unknown";
       }
     }
 
-    console.log("\n--- Submitting Grades to Canvas ---\n");
+    log("\n--- Submitting Grades to Canvas ---\n");
 
     const submittedGrades = [];
 
@@ -881,41 +901,41 @@ ${enrichPointHistory(studentEntries, postsByUrl)}`;
         });
         logChange(`GRADE: ${courseName} | ${student.canvasName} | ${student.grade} | ${student.points} pts | ${student.percentile.toFixed(1)}%ile`);
         if (verbose) {
-          console.log(`  [OK] ${student.canvasName}: ${student.grade}`);
+          log(`  [OK] ${student.canvasName}: ${student.grade}`);
         }
       } catch (error) {
         errors++;
         logChange(`ERROR: ${courseName} | ${student.canvasName} | ${error.message}`);
-        console.error(
+        logError(
           `  [ERROR] ${student.canvasName}: ${error.message}`
         );
       }
     }
 
-    console.log(`\nSubmitted: ${submitted}, Errors: ${errors}`);
+    log(`\nSubmitted: ${submitted}, Errors: ${errors}`);
 
     // Step 8: Verify grades
-    console.log("\n--- Verifying Grades ---\n");
+    log("\n--- Verifying Grades ---\n");
     try {
       verification = await verifyGrades(canvasId, assignmentId, submittedGrades);
-      console.log(`Verified ${verification.verified}/${verification.total} grades match`);
+      log(`Verified ${verification.verified}/${verification.total} grades match`);
       logChange(`VERIFICATION: ${courseName} | ${verification.verified}/${verification.total} grades verified`);
 
       if (verification.mismatches.length > 0) {
-        console.log("\nMismatches found:");
+        log("\nMismatches found:");
         for (const mismatch of verification.mismatches) {
-          console.log(`  ${mismatch.name}: expected ${mismatch.expected}, got ${mismatch.actual}`);
+          log(`  ${mismatch.name}: expected ${mismatch.expected}, got ${mismatch.actual}`);
           logChange(`MISMATCH: ${courseName} | ${mismatch.name} | expected ${mismatch.expected} | got ${mismatch.actual}`);
         }
       }
     } catch (error) {
-      console.error("  Error verifying grades:", error.message);
+      logError("  Error verifying grades:", error.message);
       logChange(`ERROR: Verification failed for ${courseName}: ${error.message}`);
     }
 
     logChange(`EXPORT COMPLETED: ${courseName} | Assignment: "${assignmentName}" in "${assignmentGroupName}" | ${submitted} submitted | ${errors} errors`);
   } else {
-    console.log("\n[DRY RUN] No grades submitted. Remove --dry-run to submit.");
+    log("\n[DRY RUN] No grades submitted. Remove --dry-run to submit.");
   }
 
   return {
@@ -923,7 +943,7 @@ ${enrichPointHistory(studentEntries, postsByUrl)}`;
     courseName,
     stats,
     studentsWithGrades,
-    unmatchedLottery,
+    unmatchedLottery: tagLikelyDropped(unmatchedLottery, classes[courseName]?.roster),
     submitted,
     errors,
     verification,
@@ -1054,4 +1074,4 @@ if (process.argv[1] === __filename) {
 }
 
 // Exports for testing
-export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas, processCourse, computeGrade, parseArgs };
+export { MIN_CONFIDENCE, parseNameParts, scoreNameMatch, matchLotteryToCanvas, tagLikelyDropped, processCourse, computeGrade, parseArgs };

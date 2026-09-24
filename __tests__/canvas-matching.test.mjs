@@ -3,6 +3,7 @@ import {
   parseNameParts,
   scoreNameMatch,
   matchLotteryToCanvas,
+  tagLikelyDropped,
 } from "../export-lottery-to-canvas.mjs";
 
 describe("parseNameParts", () => {
@@ -214,5 +215,33 @@ describe("matchLotteryToCanvas", () => {
     expect(result.ties).toHaveLength(1);
     expect(result.ties[0].canvasName).toBe("James Smith");
     expect(result.ties[0].entries).toContain("James Smith");
+  });
+});
+
+describe("tagLikelyDropped", () => {
+  const unmatched = (name) => ({ name, calls: 1, points: 1, bestMatch: null, bestScore: 0 });
+
+  test("flags unmatched entries that are no longer on the roster", () => {
+    const result = tagLikelyDropped(
+      [unmatched("Lovelace, Ada"), unmatched("Turing, Alan")],
+      ["Turing, Alan"]
+    );
+    expect(result.map((u) => [u.name, u.likelyDropped])).toEqual([
+      ["Lovelace, Ada", true],
+      ["Turing, Alan", false],
+    ]);
+  });
+
+  test("compares names case- and punctuation-insensitively", () => {
+    // Lottery names are stored uppercased in some courses; the roster is not.
+    const [entry] = tagLikelyDropped([unmatched("HOPPER, GRACE M.")], ["Hopper, Grace M"]);
+    expect(entry.likelyDropped).toBe(false);
+  });
+
+  test("never flags anyone when the course has no roster", () => {
+    // Archived canvas-config.json courses carry no roster, so absence from it
+    // says nothing about whether a student dropped.
+    const [entry] = tagLikelyDropped([unmatched("Lovelace, Ada")], undefined);
+    expect(entry.likelyDropped).toBe(false);
   });
 });

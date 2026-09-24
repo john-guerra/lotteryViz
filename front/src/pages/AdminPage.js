@@ -22,7 +22,7 @@ function AdminPage() {
   const [studentIdMap, setStudentIdMap] = useState({});
   const [searchName, setSearchName] = useState("");
   const [anonymize, setAnonymize] = useState(true);
-  const [exportOpen, setExportOpen] = useState(false);
+  const [exportMode, setExportMode] = useState(null); // null | "course" | "all"
   const [canvasGrades, setCanvasGrades] = useState(null); // { byName, unmatched, loadedAt }
   const [gradesStatus, setGradesStatus] = useState("idle"); // idle|loading|ready|error
   const [gradesError, setGradesError] = useState(null);
@@ -123,7 +123,12 @@ function AdminPage() {
   // Presence of a canvas block is what makes a course exportable. A null
   // assignment id is NOT disqualifying — the live run finds or creates it.
   const canvasConfig = getCanvasConfig(course);
-  const assignmentId = canvasConfig?.lotteryAssignmentId;
+  // Every Canvas-wired course, for the all-courses export.
+  const allAssignmentIds = Object.fromEntries(
+    courses
+      .filter((c) => c.hasCanvas)
+      .map((c) => [c.key, getCanvasConfig(c.key).lotteryAssignmentId ?? null])
+  );
   const exportTitle = canvasConfig
     ? "Preview and export lottery grades to Canvas"
     : `${course} is not wired for Canvas export`;
@@ -165,11 +170,20 @@ function AdminPage() {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => setExportOpen(true)}
+              onClick={() => setExportMode("course")}
               disabled={!canvasConfig}
               title={exportTitle}
             >
               Export to Canvas
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={() => setExportMode("all")}
+              disabled={Object.keys(allAssignmentIds).length === 0}
+              title={`Preview and export: ${Object.keys(allAssignmentIds).join(", ")}`}
+            >
+              Export all courses
             </button>
           </div>
         </div>
@@ -265,10 +279,17 @@ function AdminPage() {
         />
 
         <CanvasExportModal
-          open={exportOpen}
+          // Remount per mode so switching course/all never reuses a stale preview.
+          key={exportMode || "closed"}
+          open={exportMode !== null}
           course={course}
-          assignmentId={assignmentId}
-          onClose={() => setExportOpen(false)}
+          all={exportMode === "all"}
+          assignmentIds={
+            exportMode === "all"
+              ? allAssignmentIds
+              : { [course]: canvasConfig?.lotteryAssignmentId ?? null }
+          }
+          onClose={() => setExportMode(null)}
         />
       </div>
     </SelectionProvider>

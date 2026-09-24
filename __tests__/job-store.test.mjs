@@ -44,6 +44,35 @@ describe("createJobStore", () => {
     expect(b.jobId).not.toBe(a.jobId);
   });
 
+  test("exposes lines the runner logs while it is still running", async () => {
+    const store = createJobStore();
+    let finish;
+    const { jobId } = store.start("k", (log) => {
+      log("Fetching Canvas enrollments...");
+      log("  [OK] Ada Lovelace: 104");
+      return new Promise((resolve) => (finish = resolve));
+    });
+    await flush();
+    expect(store.get(jobId)).toMatchObject({
+      status: "running",
+      log: ["Fetching Canvas enrollments...", "  [OK] Ada Lovelace: 104"],
+    });
+    finish({ submitted: 1 });
+    await flush();
+    // The log survives the transition to done, so the final view keeps it.
+    expect(store.get(jobId).log).toHaveLength(2);
+  });
+
+  test("keeps the log when a job fails", async () => {
+    const store = createJobStore();
+    const { jobId } = store.start("k", async (log) => {
+      log("started");
+      throw new Error("boom");
+    });
+    await flush();
+    expect(store.get(jobId)).toMatchObject({ status: "error", log: ["started"] });
+  });
+
   test("returns undefined for an unknown job", () => {
     expect(createJobStore().get("999")).toBeUndefined();
   });

@@ -44,6 +44,34 @@ describe("runExportJob", () => {
     });
   });
 
+  test("sends all: true instead of a course when exporting every course", async () => {
+    const fetchImpl = fakeFetch([
+      { body: { jobId: "1" } },
+      { body: { status: "done", result: { success: true, results: [] } } },
+    ]);
+    const { promise } = runExportJob({ all: true, dryRun: true, fetchImpl, ...FAST });
+    await promise;
+    expect(JSON.parse(fetchImpl.calls[0].options.body)).toEqual({ all: true, dryRun: true });
+  });
+
+  test("reports the job log to onProgress on every poll", async () => {
+    const fetchImpl = fakeFetch([
+      { body: { jobId: "1" } },
+      { body: { status: "running", log: ["a"] } },
+      { body: { status: "done", log: ["a", "b"], result: { success: true } } },
+    ]);
+    const seen = [];
+    const { promise } = runExportJob({
+      course: "c",
+      dryRun: true,
+      fetchImpl,
+      onProgress: (lines) => seen.push(lines),
+      ...FAST,
+    });
+    await promise;
+    expect(seen).toEqual([["a"], ["a", "b"]]);
+  });
+
   test("rejects when the poll returns 404 instead of resolving as success", async () => {
     // Regression: the old inline loop never checked res.ok, so a 404 body with
     // no `status` fell through every branch and resolved with result undefined.

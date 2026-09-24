@@ -20,7 +20,9 @@ async function readJson(res) {
 
 export function runExportJob({
   course,
+  all = false,
   dryRun,
+  onProgress,
   pollMs = DEFAULT_POLL_MS,
   deadlineMs = DEFAULT_DEADLINE_MS,
   fetchImpl = fetch,
@@ -46,7 +48,7 @@ export function runExportJob({
       const startRes = await fetchImpl("/api/canvas/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ course, dryRun }),
+        body: JSON.stringify(all ? { all: true, dryRun } : { course, dryRun }),
       });
       const startBody = await readJson(startRes);
       if (!startRes.ok) {
@@ -67,6 +69,7 @@ export function runExportJob({
         if (!res.ok) {
           throw new Error(job.error || `Could not read job ${jobId} (${res.status})`);
         }
+        if (onProgress && job.log) onProgress(job.log);
 
         if (job.status === "running") {
           if (Date.now() > deadline) {
