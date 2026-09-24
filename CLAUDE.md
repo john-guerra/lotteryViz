@@ -30,9 +30,9 @@ that split is gone.
 ### Other commands
 
 - `yarn backup` - Manually run database backup
-- `yarn test` - Run all 207 tests (backend + frontend) via Vitest
-- `yarn test --project node` - Backend `.mjs` suites only (191 tests)
-- `yarn test --project jsdom` - Frontend component tests only (16 tests)
+- `yarn test` - Run all 240 tests (backend + frontend) via Vitest
+- `yarn test --project node` - Backend `.mjs` suites only (223 tests)
+- `yarn test --project jsdom` - Frontend component tests only (17 tests)
 - `yarn export-to-canvas` - Export lottery data to Canvas LMS
 
 A Vitest project whose `include` glob matches no files reports SUCCESS with zero tests
