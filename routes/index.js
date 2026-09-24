@@ -4,6 +4,7 @@ import cors from "cors";
 let router = express.Router();
 
 import myDB from "../db/myDB.js";
+import { localhostOnly } from "./request-guard.mjs";
 
 // const dbName = "lottery_web";
 // const dbName = "lottery_web_spring2021";
@@ -16,13 +17,8 @@ import { classes } from "../front/src/students.mjs";
 
 // STUDENT LIST GOES INTO front/src/students.mjs
 
-router.post("/setGrade", function (req, res) {
+router.post("/setGrade", localhostOnly, function (req, res) {
   console.log("***setGrade", req.ip, req.body);
-
-  if (req.ip !== "127.0.0.1") {
-    console.log("Request not from localhost ", req.ip, " ignoring");
-    return;
-  }
 
   myDB.setGrade(req.body, () => {
     console.log("done!");
@@ -30,13 +26,8 @@ router.post("/setGrade", function (req, res) {
   });
 });
 
-router.post("/delete", function (req, res) {
+router.post("/delete", localhostOnly, function (req, res) {
   console.log("*** delete", req.ip, req.body);
-
-  if (req.ip !== "127.0.0.1") {
-    console.log("Request not from localhost ", req.ip, " ignoring");
-    return;
-  }
 
   myDB.deleteGrade(req.body, (err) => {
     if (err) {
@@ -100,11 +91,12 @@ router.get("/getCounts/:course", cors(corsOptions), function (req, res) {
 
   myDB.getCounts(req.params.course, (counts) => {
     console.log("Got counts!");
+    // An archived course has lottery data but no students.mjs entry. Throwing
+    // here would escape through the mongodb driver's nextTick rethrow and
+    // crash the whole server, so treat it as an empty roster instead.
+    const roster = classes[req.params.course]?.roster ?? [];
     res.json(
-      counts.filter(
-        (g) =>
-          !FILTER_BY_REGISTERED || classes[req.params.course].roster.includes(g._id)
-      )
+      counts.filter((g) => !FILTER_BY_REGISTERED || roster.includes(g._id))
     );
   });
 });

@@ -4,6 +4,7 @@
 import express from "express";
 import { loadDotenv } from "../loadDotenv.mjs";
 import { createJobStore } from "./job-store.mjs";
+import { isLocalhost } from "./request-guard.mjs";
 import { processCourse, resolveCourseConfig } from "../export-lottery-to-canvas.mjs";
 import { listCourses } from "../front/src/courses.mjs";
 
@@ -11,14 +12,6 @@ loadDotenv();
 
 const router = express.Router();
 const jobs = createJobStore();
-
-// Mirrors routes/participation.js:27-31, but as a predicate rather than
-// middleware: only the live run is guarded, and that is decided per-request
-// from the body, not per-route.
-function isLocalhost(req) {
-  const ip = req.ip;
-  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
-}
 
 // Runs each course in turn and keeps going past a failure, like the CLI's
 // --all. Only active students.mjs courses: archived canvas-config.json courses
@@ -38,7 +31,13 @@ async function exportAll(courses, { dryRun, log }) {
 }
 
 router.post("/export", (req, res) => {
-  const { course, all = false, dryRun = true } = req.body || {};
+  const body = req.body || {};
+  // Only a literal `false` means live and only a literal `true` means all
+  // courses: a truthy string or "" from a stray or forged body must never
+  // flip either one.
+  const dryRun = body.dryRun !== false;
+  const all = body.all === true;
+  const { course } = body;
   if (!all && !course) return res.status(400).json({ error: "course is required" });
 
   const courses = all

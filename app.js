@@ -8,6 +8,7 @@ import logger from "morgan";
 import indexRouter from "./routes/index.js";
 import participationRouter from "./routes/participation.js";
 import canvasRouter from "./routes/canvas.js";
+import { sameMachineOnly } from "./routes/request-guard.mjs";
 
 import { URL } from "url";
 
@@ -16,8 +17,11 @@ const __dirname = new URL(".", import.meta.url).pathname;
 const app = express();
 
 app.use(logger("dev"));
+// Before any parser or route: rejects foreign Host headers and cross-site
+// writes. There is deliberately no express.urlencoded() — every client posts
+// JSON, and accepting form bodies is what let other sites forge requests.
+app.use(sameMachineOnly);
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 // app.use(lessMiddleware(path.join(__dirname, "front/build")));
 app.use(express.static(path.join(__dirname, "front/build")));

@@ -4,6 +4,7 @@
 // client polls, so a 30s+ first run never blocks an HTTP request.
 import express from "express";
 import { loadDotenv } from "../loadDotenv.mjs";
+import { localhostOnly } from "./request-guard.mjs";
 import { getAvailableCourses } from "../slack-checker/matcher.mjs";
 import { getPosts } from "../slack-checker/ledger.mjs";
 import { scanOffers } from "../slack-checker/scan.mjs";
@@ -21,15 +22,6 @@ const router = express.Router();
 
 const DEFAULT_HOURS = 24;
 const DEFAULT_POINTS = 2;
-
-// Reject mutating requests that don't originate from the instructor's machine
-// (same intent as routes/index.js's `req.ip !== "127.0.0.1"` guard). The server
-// binds to 127.0.0.1, so legitimate traffic arrives as IPv4 (or IPv6 loopback).
-function localhostOnly(req, res, next) {
-  const ip = req.ip;
-  if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") return next();
-  return res.status(403).json({ error: "This action is only allowed from localhost." });
-}
 
 // Courses are taught in different Slack workspaces, so the client is resolved
 // per course rather than once per process. getSlackApiForCourse throws a
