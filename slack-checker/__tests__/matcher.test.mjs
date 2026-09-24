@@ -247,10 +247,41 @@ describe('Integration', () => {
       expect(result.matched[0].slackName).toBe('Kiki (Keiko Tanaka)');
     });
 
-    test('keeps the best-scoring candidate name, whichever comes first', () => {
-      const result = matchNames([['Ben', 'Ben Piperno']], testRoster);
-      expect(result.matched[0].rosterName).toBe('Piperno, Ben Raphael');
-      expect(result.matched[0].confidence).toBeGreaterThanOrEqual(90);
+    test('breaks a tie toward the fuller name, not the nickname checked first', () => {
+      // A bare first name is an exact roster format (100), so "Anh" ties
+      // "Nguyen, Anh" with the real name's exact match on "Tran, Anh".
+      const result = matchNames([['Anh', 'Anh Tran']], ['Nguyen, Anh', 'Tran, Anh']);
+      expect(result.matched[0].rosterName).toBe('Tran, Anh');
+    });
+
+    test('gives a roster student to only one Slack user', () => {
+      // Two people resolving to the same student would award them twice.
+      const result = matchNames([['Anh'], ['Anh Nguyen']], ['Nguyen, Anh', 'Tran, Anh']);
+      expect(result.matched.map((m) => m.rosterName)).toEqual(['Nguyen, Anh']);
+      expect(result.matched[0].slackName).toBe('Anh Nguyen');
+      expect(result.unmatched).toEqual(['Anh']);
+    });
+
+    test('does not treat a different last name with the same initial as a match', () => {
+      // e.g. a TA with a handle display name whose real name shares a first
+      // name and last initial with a student.
+      expect(matchNames([['kx', 'Maria Lopez']], ['Lee, Maria']).matched).toEqual([]);
+    });
+
+    test('still matches first name + last initial', () => {
+      expect(matchNames(['Maria L.'], ['Lee, Maria']).matched[0].rosterName).toBe('Lee, Maria');
+    });
+
+    test('matches first name + last initial against a "First Last" roster', () => {
+      // No comma means no precomputed "maria l" format, so the initial rule
+      // itself must see the one-letter word.
+      const result = matchNames(['Maria L.'], ['Maria Lee', 'Mario Lopez']);
+      expect(result.matched[0].rosterName).toBe('Maria Lee');
+      expect(result.matched[0].confidence).toBe(85);
+    });
+
+    test('matches first and last name as whole words, not substrings', () => {
+      expect(matchNames([['prof', 'Johnny Smithers']], ['Smith, John A.']).matched).toEqual([]);
     });
 
     test('reports an unmatched multi-name person by its label', () => {

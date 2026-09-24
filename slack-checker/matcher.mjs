@@ -150,6 +150,11 @@ export function parseRosterName(rosterName) {
   };
 }
 
+/** `phrase` (one or more words) appears in `name` as whole words. */
+function hasWords(name, phrase) {
+  return Boolean(phrase) && ` ${name} `.includes(` ${phrase} `);
+}
+
 /**
  * Score how well a Slack name matches a roster entry
  * @returns {number} - Score 0-100 (higher is better)
@@ -157,6 +162,8 @@ export function parseRosterName(rosterName) {
 export function scoreMatch(slackName, rosterParsed) {
   const slack = normalizeName(slackName);
   const slackParts = slack.split(" ").filter((p) => p.length > 1);
+  // Unfiltered, for the rule that needs the one-letter initial in "Maria L."
+  const slackWords = slack.split(" ").filter(Boolean);
 
   // Exact match with any format
   for (const format of rosterParsed.formats) {
@@ -165,11 +172,12 @@ export function scoreMatch(slackName, rosterParsed) {
 
   // Check if Slack name contains first AND last name (high confidence)
   // This handles "Ben Piperno" matching "Piperno, Ben R. Confidential"
+  // Whole words, so "Johnny Smithers" does not contain "John" and "Smith".
   if (
     rosterParsed.firstName &&
     rosterParsed.lastName &&
-    slack.includes(rosterParsed.firstName) &&
-    slack.includes(rosterParsed.lastName)
+    hasWords(slack, rosterParsed.firstName) &&
+    hasWords(slack, rosterParsed.lastName)
   ) {
     return 95;
   }
@@ -183,12 +191,14 @@ export function scoreMatch(slackName, rosterParsed) {
     return 90;
   }
 
-  // Check if first name + last initial
+  // Check if first name + last initial ("Maria L", "Maria Le"). The later word
+  // must abbreviate the last name: a different last name that merely shares
+  // its initial ("Maria Lopez" vs "Lee, Maria") is a different person.
   if (
     rosterParsed.firstName &&
     rosterParsed.lastName &&
-    slack.startsWith(rosterParsed.firstName) &&
-    slack.includes(rosterParsed.lastName[0])
+    slackWords[0] === rosterParsed.firstName &&
+    slackWords.slice(1).some((part) => rosterParsed.lastName.startsWith(part))
   ) {
     return 85;
   }
@@ -204,6 +214,22 @@ export function scoreMatch(slackName, rosterParsed) {
     }
   }
 
+  // Same first name but a clearly different surname is a different person,
+  // however close the strings look overall ("Maria Lopez" vs "Lee, Maria"
+  // is 73% similar). One edit is still tolerated as a typo; anything wider
+  // lands in the preview's unmatched list rather than on the wrong student.
+  const lastWord = slackParts[slackParts.length - 1];
+  if (
+    slackParts.length >= 2 &&
+    slackParts[0] === rosterParsed.firstName &&
+    lastWord.length >= 3 &&
+    !rosterParsed.lastName.startsWith(lastWord) &&
+    !rosterParsed.normalized.split(" ").includes(lastWord) &&
+    levenshtein(lastWord, rosterParsed.lastName) > 1
+  ) {
+    return 0;
+  }
+
   // Fuzzy match against each format, take best score
   let bestScore = 0;
   for (const format of rosterParsed.formats) {
@@ -212,12 +238,12 @@ export function scoreMatch(slackName, rosterParsed) {
   }
 
   // Boost score if first name matches exactly
-  if (slack.includes(rosterParsed.firstName) && rosterParsed.firstName.length >= 3) {
+  if (hasWords(slack, rosterParsed.firstName) && rosterParsed.firstName.length >= 3) {
     bestScore = Math.min(100, bestScore + 15);
   }
 
   // Boost score if last name matches exactly
-  if (slack.includes(rosterParsed.lastName) && rosterParsed.lastName.length >= 3) {
+  if (hasWords(slack, rosterParsed.lastName) && rosterParsed.lastName.length >= 3) {
     bestScore = Math.min(100, bestScore + 15);
   }
 
@@ -252,13 +278,19 @@ export function matchNames(slackNames, roster) {
         : candidates[0] ?? "";
     let bestMatch = null;
     let bestScore = 0;
+    let bestWords = 0;
 
     for (const candidate of candidates) {
+      const words = normalizeName(candidate).split(" ").length;
       for (const parsed of rosterParsed) {
         const score = scoreMatch(candidate, parsed);
-        if (score > bestScore) {
+        // On a tie, the fuller name wins: a bare first name scores 100 against
+        // every student with that first name, so it must not outrank a real
+        // name's exact match just because display_name is checked first.
+        if (score > bestScore || (score === bestScore && words > bestWords)) {
           bestScore = score;
           bestMatch = parsed;
+          bestWords = words;
         }
       }
     }
@@ -273,6 +305,27 @@ export function matchNames(slackNames, roster) {
       unmatched.push(slackName);
     }
   }
+
+  // One roster student per Slack user: if two users resolved to the same
+  // student, only the stronger match is awarded; the other is reported
+  // unmatched so the instructor sees it in the preview.
+  // Ties go to the fuller Slack name, as in candidate selection above.
+  const words = (m) => normalizeName(m.slackName).split(" ").length;
+  const claimed = new Map();
+  for (const m of matched) {
+    const prev = claimed.get(m.rosterName);
+    if (
+      !prev ||
+      m.confidence > prev.confidence ||
+      (m.confidence === prev.confidence && words(m) > words(prev))
+    ) {
+      claimed.set(m.rosterName, m);
+    }
+  }
+  for (const m of matched) {
+    if (claimed.get(m.rosterName) !== m) unmatched.push(m.slackName);
+  }
+  matched.splice(0, matched.length, ...matched.filter((m) => claimed.get(m.rosterName) === m));
 
   // Sort matched by confidence (highest first)
   matched.sort((a, b) => b.confidence - a.confidence);
