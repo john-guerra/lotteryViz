@@ -142,11 +142,13 @@ export function createSlackApi(token, { WebClientClass = WebClient } = {}) {
   }
 
   /**
-   * Get a user's display name
+   * Get every name a user goes by, display name first. Students (often
+   * international ones) set a nickname as display_name, which on its own
+   * would hide the roster name that only real_name carries.
    * @param {string} userId - Slack user ID
-   * @returns {Promise<string>} - User's display name or real name
+   * @returns {Promise<string[]>} - Distinct non-empty names, never empty
    */
-  async function getUserDisplayName(userId) {
+  async function getUserNames(userId) {
     try {
       const result = await client.users.info({ user: userId });
 
@@ -155,27 +157,36 @@ export function createSlackApi(token, { WebClientClass = WebClient } = {}) {
       }
 
       const user = result.user;
-      // Prefer display_name, fall back to real_name
-      return (
-        user.profile.display_name || user.profile.real_name || user.name || userId
-      );
+      const names = [user.profile.display_name, user.profile.real_name]
+        .map((n) => n?.trim())
+        .filter(Boolean);
+      return names.length > 0 ? [...new Set(names)] : [user.name || userId];
     } catch {
       console.error(`Warning: Could not fetch user info for ${userId}`);
-      return userId;
+      return [userId];
     }
   }
 
   /**
-   * Get display names for multiple users (with caching)
+   * Get a user's display name
+   * @param {string} userId - Slack user ID
+   * @returns {Promise<string>} - User's display name or real name
+   */
+  async function getUserDisplayName(userId) {
+    return (await getUserNames(userId))[0];
+  }
+
+  /**
+   * Get every name for multiple users, for matchNames
    * @param {string[]} userIds - Array of Slack user IDs
-   * @returns {Promise<Map<string, string>>} - Map of userId to displayName
+   * @returns {Promise<Map<string, string[]>>} - Map of userId to [display_name, real_name]
    */
   async function getUserDisplayNames(userIds) {
     const uniqueIds = [...new Set(userIds)];
     const nameMap = new Map();
 
     for (const userId of uniqueIds) {
-      nameMap.set(userId, await getUserDisplayName(userId));
+      nameMap.set(userId, await getUserNames(userId));
     }
 
     return nameMap;
@@ -274,6 +285,7 @@ export function createSlackApi(token, { WebClientClass = WebClient } = {}) {
     whoAmI,
     getThreadReplies,
     getParentMessage,
+    getUserNames,
     getUserDisplayName,
     getUserDisplayNames,
     listChannels,

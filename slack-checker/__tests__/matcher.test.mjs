@@ -233,6 +233,36 @@ describe('Integration', () => {
       'Smith, Jane Elizabeth',
     ];
 
+    test('matches through the real name when the display name is a nickname', () => {
+      // International students often set a nickname as their Slack display
+      // name; only real_name carries the roster name.
+      const result = matchNames([['Kiki', 'Keiko Tanaka']], ['Tanaka, Keiko']);
+      expect(result.matched).toHaveLength(1);
+      expect(result.matched[0].rosterName).toBe('Tanaka, Keiko');
+      expect(result.matched[0].confidence).toBeGreaterThanOrEqual(90);
+    });
+
+    test('labels a multi-name person with both names', () => {
+      const result = matchNames([['Kiki', 'Keiko Tanaka']], ['Tanaka, Keiko']);
+      expect(result.matched[0].slackName).toBe('Kiki (Keiko Tanaka)');
+    });
+
+    test('keeps the best-scoring candidate name, whichever comes first', () => {
+      const result = matchNames([['Ben', 'Ben Piperno']], testRoster);
+      expect(result.matched[0].rosterName).toBe('Piperno, Ben Raphael');
+      expect(result.matched[0].confidence).toBeGreaterThanOrEqual(90);
+    });
+
+    test('reports an unmatched multi-name person by its label', () => {
+      const result = matchNames([['zz', 'Qqq Www']], testRoster);
+      expect(result.unmatched).toEqual(['zz (Qqq Www)']);
+    });
+
+    test('collapses identical candidate names into a single label', () => {
+      const result = matchNames([['Nina Jordan', 'Nina Jordan']], testRoster);
+      expect(result.matched[0].slackName).toBe('Nina Jordan');
+    });
+
     test('returns matched and unmatched arrays', () => {
       const result = matchNames(['Ben Piperno', 'xyz123'], testRoster);
       expect(result).toHaveProperty('matched');

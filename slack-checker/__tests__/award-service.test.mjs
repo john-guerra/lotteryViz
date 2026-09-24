@@ -96,6 +96,19 @@ describe("previewThread()", () => {
   });
 });
 
+describe("previewThread() with nickname display names", () => {
+  test("matches a responder whose display name is a nickname via real_name", async () => {
+    const { deps } = makeDeps({
+      loadStudentRoster: () => ["Tanaka, Keiko", "Jones, Bob"],
+      getUserDisplayNames: async (ids) =>
+        new Map(ids.map((id) => [id, { U1: ["Kiki", "Keiko Tanaka"], U2: ["Bob Jones"] }[id]])),
+    });
+    const result = await previewThread({ course: "c", threadUrl: "url", hours: 1 }, deps);
+    expect(result.matched.map((m) => m.rosterName).sort()).toEqual(["Jones, Bob", "Tanaka, Keiko"]);
+    expect(result.unmatched).toEqual([]);
+  });
+});
+
 describe("commitAward()", () => {
   test("awards one grade per matched student and records the ledger", async () => {
     const { deps, calls } = makeDeps();

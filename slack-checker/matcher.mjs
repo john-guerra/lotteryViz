@@ -228,10 +228,14 @@ export function scoreMatch(slackName, rosterParsed) {
 export const MIN_CONFIDENCE = 70;
 
 /**
- * Match Slack display names to student roster
- * @param {string[]} slackNames - Array of Slack display names
+ * Match Slack users to student roster
+ * @param {Array<string|string[]>} slackNames - One entry per Slack user: a name,
+ *   or every name that user goes by (e.g. [display_name, real_name]). A
+ *   nickname display name hides the roster name, so each candidate is scored
+ *   and the best one wins.
  * @param {string[]} roster - Array of roster names (format: "LastName, FirstName M.")
  * @returns {{ matched: Array<{slackName: string, rosterName: string, confidence: number}>, unmatched: string[] }}
+ *   `slackName` and `unmatched` hold a label like "Kiki (Keiko Tanaka)".
  */
 export function matchNames(slackNames, roster) {
   const matched = [];
@@ -240,15 +244,22 @@ export function matchNames(slackNames, roster) {
   // Pre-process roster names
   const rosterParsed = roster.map((name) => parseRosterName(name));
 
-  for (const slackName of slackNames) {
+  for (const entry of slackNames) {
+    const candidates = [...new Set([entry].flat().filter(Boolean))];
+    const slackName =
+      candidates.length > 1
+        ? `${candidates[0]} (${candidates.slice(1).join(", ")})`
+        : candidates[0] ?? "";
     let bestMatch = null;
     let bestScore = 0;
 
-    for (const parsed of rosterParsed) {
-      const score = scoreMatch(slackName, parsed);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = parsed;
+    for (const candidate of candidates) {
+      for (const parsed of rosterParsed) {
+        const score = scoreMatch(candidate, parsed);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = parsed;
+        }
       }
     }
 
