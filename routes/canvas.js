@@ -3,7 +3,7 @@
 // same pattern as the Slack scan in routes/participation.js.
 import express from "express";
 import { loadDotenv } from "../loadDotenv.mjs";
-import { createJobStore } from "./job-store.mjs";
+import { createJobStore, createCourseLock } from "./job-store.mjs";
 import { isLocalhost } from "./request-guard.mjs";
 import { processCourse, resolveCourseConfig } from "../export-lottery-to-canvas.mjs";
 import { listCourses } from "../front/src/courses.mjs";
@@ -12,6 +12,7 @@ loadDotenv();
 
 const router = express.Router();
 const jobs = createJobStore();
+const liveLock = createCourseLock();
 
 // Runs each course in turn and keeps going past a failure, like the CLI's
 // --all. Only active students.mjs courses: archived canvas-config.json courses
@@ -40,9 +41,23 @@ router.post("/export", (req, res) => {
   const { course } = body;
   if (!all && !course) return res.status(400).json({ error: "course is required" });
 
-  const courses = all
-    ? listCourses().filter((c) => c.hasCanvas).map((c) => c.key)
-    : [course];
+  const wired = listCourses().filter((c) => c.hasCanvas).map((c) => c.key);
+  let courses = [course];
+  if (all) {
+    // A live all-courses run writes exactly the courses the instructor saw
+    // previewed. Re-deriving the list here would also submit a course whose
+    // preview failed, i.e. write grades nobody looked at.
+    if (!dryRun && !Array.isArray(body.courses)) {
+      return res.status(400).json({ error: "A live all-courses export must list its courses." });
+    }
+    courses = Array.isArray(body.courses) ? body.courses : wired;
+    const unknown = courses.filter((c) => !wired.includes(c));
+    if (unknown.length > 0) {
+      return res
+        .status(400)
+        .json({ error: `Not wired for Canvas export: ${unknown.join(", ")}` });
+    }
+  }
   if (courses.length === 0) {
     return res.status(400).json({ error: "No courses are wired for Canvas export." });
   }
@@ -63,12 +78,27 @@ router.post("/export", (req, res) => {
 
   // Dry and live runs are separate jobs for the same course, so key them apart —
   // otherwise a confirm would be deduped into the preview that is still running.
-  const key = `${all ? "all" : course}:${dryRun ? "dry" : "live"}`;
-  const { jobId, reused } = jobs.start(key, (log) =>
-    all
-      ? exportAll(courses, { dryRun, log })
-      : processCourse(course, { dryRun, verbose: true, log })
-  );
+  const key = `${all ? `all:${courses.join(",")}` : course}:${dryRun ? "dry" : "live"}`;
+
+  // Taken synchronously, before any await, so two requests can't both pass.
+  if (!dryRun) {
+    const { ok, busy } = liveLock.tryAcquire(courses);
+    if (!ok) {
+      return res.status(409).json({
+        error: `A live export is already running for ${busy.join(", ")}. Wait for it to finish.`,
+      });
+    }
+  }
+
+  const { jobId, reused } = jobs.start(key, async (log) => {
+    try {
+      return all
+        ? await exportAll(courses, { dryRun, log })
+        : await processCourse(course, { dryRun, verbose: true, log });
+    } finally {
+      if (!dryRun) liveLock.release(courses);
+    }
+  });
 
   res.json(reused ? { jobId, reused } : { jobId });
 });

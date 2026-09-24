@@ -54,6 +54,26 @@ describe("runExportJob", () => {
     expect(JSON.parse(fetchImpl.calls[0].options.body)).toEqual({ all: true, dryRun: true });
   });
 
+  test("sends the previewed course list with an all-courses run", async () => {
+    const fetchImpl = fakeFetch([
+      { body: { jobId: "1" } },
+      { body: { status: "done", result: { success: true, results: [] } } },
+    ]);
+    const { promise } = runExportJob({
+      all: true,
+      courses: ["a", "b"],
+      dryRun: false,
+      fetchImpl,
+      ...FAST,
+    });
+    await promise;
+    expect(JSON.parse(fetchImpl.calls[0].options.body)).toEqual({
+      all: true,
+      courses: ["a", "b"],
+      dryRun: false,
+    });
+  });
+
   test("reports the job log to onProgress on every poll", async () => {
     const fetchImpl = fakeFetch([
       { body: { jobId: "1" } },

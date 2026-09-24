@@ -82,7 +82,12 @@ function UnmatchedList({ unmatched }) {
   );
 
   if (visible.length === 0) {
-    return <div className="text-muted small mb-2">{toggle}</div>;
+    return (
+      <div className="text-muted small mb-2">
+        {unmatched.length} unmatched, all likely dropped.
+        {toggle}
+      </div>
+    );
   }
 
   return (
@@ -219,7 +224,7 @@ export default function CanvasExportModal({
   }, []);
 
   const run = useCallback(
-    (dryRun) => {
+    (dryRun, courses) => {
       setPhase(dryRun ? "running" : "committing");
       setError(null);
       setLogLines([]);
@@ -227,6 +232,7 @@ export default function CanvasExportModal({
       const job = runExportJob({
         course,
         all,
+        courses,
         dryRun,
         onProgress: setLogLines,
         deadlineMs: (dryRun ? DRY_RUN_DEADLINE_MS : LIVE_DEADLINE_MS) * courseCount,
@@ -340,7 +346,9 @@ export default function CanvasExportModal({
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => run(false)}
+                onClick={() =>
+                  run(false, all ? gradedCourses.map((r) => r.courseName) : undefined)
+                }
                 disabled={totalStudents === 0}
               >
                 {submitLabel}

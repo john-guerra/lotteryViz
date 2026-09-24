@@ -21,6 +21,7 @@ async function readJson(res) {
 export function runExportJob({
   course,
   all = false,
+  courses,
   dryRun,
   onProgress,
   pollMs = DEFAULT_POLL_MS,
@@ -48,7 +49,9 @@ export function runExportJob({
       const startRes = await fetchImpl("/api/canvas/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(all ? { all: true, dryRun } : { course, dryRun }),
+        body: JSON.stringify(
+          all ? { all: true, ...(courses && { courses }), dryRun } : { course, dryRun }
+        ),
       });
       const startBody = await readJson(startRes);
       if (!startRes.ok) {

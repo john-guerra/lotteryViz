@@ -1,4 +1,4 @@
-import { createJobStore } from "../routes/job-store.mjs";
+import { createJobStore, createCourseLock } from "../routes/job-store.mjs";
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -75,5 +75,22 @@ describe("createJobStore", () => {
 
   test("returns undefined for an unknown job", () => {
     expect(createJobStore().get("999")).toBeUndefined();
+  });
+});
+
+describe("createCourseLock", () => {
+  test("refuses courses already held, all or nothing", () => {
+    const lock = createCourseLock();
+    expect(lock.tryAcquire(["a", "b"])).toEqual({ ok: true });
+    // "b" is busy, so "c" must not be taken either.
+    expect(lock.tryAcquire(["b", "c"])).toEqual({ ok: false, busy: ["b"] });
+    expect(lock.tryAcquire(["c"])).toEqual({ ok: true });
+  });
+
+  test("release frees the courses for the next run", () => {
+    const lock = createCourseLock();
+    lock.tryAcquire(["a"]);
+    lock.release(["a"]);
+    expect(lock.tryAcquire(["a"])).toEqual({ ok: true });
   });
 });

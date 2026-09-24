@@ -238,6 +238,17 @@ describe("tagLikelyDropped", () => {
     expect(entry.likelyDropped).toBe(false);
   });
 
+  test("never flags a displaced entry — Canvas has that person, so it is a duplicate spelling", () => {
+    // A lottery name that lost its Canvas match to a higher-confidence entry is
+    // the same student under two spellings, not a dropout; hiding it would hide
+    // points that silently fail to count.
+    const [entry] = tagLikelyDropped(
+      [{ ...unmatched("Lovelace, Ada ."), bestMatch: "Ada Lovelace", bestScore: 95, displaced: true }],
+      ["Turing, Alan"]
+    );
+    expect(entry.likelyDropped).toBe(false);
+  });
+
   test("never flags anyone when the course has no roster", () => {
     // Archived canvas-config.json courses carry no roster, so absence from it
     // says nothing about whether a student dropped.

@@ -69,6 +69,19 @@ describe("CanvasExportModal", () => {
     expect(screen.getByText(/Dropped, Dora/)).toBeInTheDocument();
   });
 
+  test("keeps an unmatched count visible when every entry is likely dropped", async () => {
+    const job = controllableJob();
+    render(<CanvasExportModal open course="webdev" onClose={() => {}} />);
+    await finish(
+      job,
+      courseResult("webdev", {
+        unmatchedLottery: [{ name: "Dropped, Dora", calls: 1, points: 1, likelyDropped: true }],
+      })
+    );
+    expect(screen.getByText(/1 unmatched/)).toBeInTheDocument();
+    expect(screen.queryByText(/Dropped, Dora/)).not.toBeInTheDocument();
+  });
+
   test("streams job log lines while the export is running", async () => {
     const job = controllableJob();
     render(<CanvasExportModal open course="webdev" onClose={() => {}} />);
@@ -97,6 +110,12 @@ describe("CanvasExportModal", () => {
     const submit = screen.getByRole("button", { name: /Submit 2 grades across 2 courses/ });
     const liveJob = controllableJob();
     fireEvent.click(submit);
-    expect(liveJob.opts).toMatchObject({ all: true, dryRun: false });
+    // Only the courses the instructor actually saw previewed are submitted;
+    // the failed "broken" preview must not be written blind.
+    expect(liveJob.opts).toMatchObject({
+      all: true,
+      dryRun: false,
+      courses: ["webdev", "aicoding"],
+    });
   });
 });

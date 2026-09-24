@@ -412,13 +412,16 @@ function matchLotteryToCanvas(lotteryCounts, canvasEnrollments) {
  * Mark unmatched lottery entries whose name is no longer on the course roster.
  * An entry that is off the roster AND has no Canvas match most likely belongs
  * to a student who dropped. With no roster (archived courses) nothing is
- * flagged, since absence from a missing list proves nothing.
+ * flagged, since absence from a missing list proves nothing. A displaced entry
+ * is never flagged: Canvas does have that person (another spelling claimed the
+ * match first), so its points are silently not counting and must stay visible.
  */
 function tagLikelyDropped(unmatchedLottery, roster) {
   const onRoster = new Set((roster || []).map(normalizeName));
   return unmatchedLottery.map((entry) => ({
     ...entry,
-    likelyDropped: Boolean(roster) && !onRoster.has(normalizeName(entry.name)),
+    likelyDropped:
+      Boolean(roster) && !entry.displaced && !onRoster.has(normalizeName(entry.name)),
   }));
 }
 

@@ -37,3 +37,23 @@ export function createJobStore() {
     },
   };
 }
+
+// Courses with a live (grade-writing) export in progress. Two live runs over
+// the same course would PUT every grade twice and send each student two
+// comments, and with no configured assignment both would create one. The job
+// store's key dedupe can't see this: "webdev:live" and "all:live" differ.
+export function createCourseLock() {
+  const held = new Set();
+  return {
+    /** Take every course or none. */
+    tryAcquire(courses) {
+      const busy = courses.filter((c) => held.has(c));
+      if (busy.length > 0) return { ok: false, busy };
+      for (const c of courses) held.add(c);
+      return { ok: true };
+    },
+    release(courses) {
+      for (const c of courses) held.delete(c);
+    },
+  };
+}
