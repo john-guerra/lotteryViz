@@ -101,3 +101,6 @@ front/package-lock.json
 
 # Backup files
 *.old
+
+# Grade dumps hold student names and grades
+bk_grades*.json
